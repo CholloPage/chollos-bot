@@ -1,0 +1,80 @@
+name: Publicar chollo
+
+on:
+  schedule:
+    # Cada 2 horas en punto (UTC). GitHub puede retrasarlo unos minutos
+    # cuando hay cola; es normal y no rompe nada.
+    - cron: "0 */2 * * *"
+  workflow_dispatch: {}   # boton para lanzarlo a mano desde la pestana Actions
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    env:
+      AMAZON_TAG: ${{ secrets.AMAZON_TAG }}
+      META_TOKEN: ${{ secrets.META_TOKEN }}
+      FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+      IG_USER_ID: ${{ secrets.IG_USER_ID }}
+      MARCA: ${{ vars.MARCA }}
+      PAGES_URL: ${{ vars.PAGES_URL }}
+      # Servimos la imagen desde raw.githubusercontent: esta disponible
+      # nada mas hacer push, sin esperar al despliegue de Pages.
+      IMAGENES_BASE: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/docs/img
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Preparar la oferta
+        run: python bot.py preparar
+
+      - name: Salir si no habia nada pendiente
+        id: comprobar
+        run: |
+          if [ -f pendiente.json ]; then
+            echo "hay=si" >> "$GITHUB_OUTPUT"
+          else
+            echo "hay=no" >> "$GITHUB_OUTPUT"
+            echo "No quedan ofertas pendientes. Anade mas filas a ofertas.csv."
+          fi
+
+      - name: Subir la imagen al repositorio
+        if: steps.comprobar.outputs.hay == 'si'
+        run: |
+          git config user.name  "bot-chollos"
+          git config user.email "bot-chollos@users.noreply.github.com"
+          git add docs/img
+          git commit -m "Imagen de la oferta $(date -u +%Y-%m-%dT%H:%M)" || exit 0
+          git push
+
+      - name: Publicar en Facebook e Instagram
+        if: steps.comprobar.outputs.hay == 'si'
+        run: python bot.py publicar
+
+      - name: Guardar estado y pagina de bio
+        if: steps.comprobar.outputs.hay == 'si'
+        run: |
+          git add estado.json docs/index.html
+          git commit -m "Chollo publicado $(date -u +%Y-%m-%dT%H:%M)" || exit 0
+          git push
+
+      - name: Dejar el paquete de TikTok descargable
+        if: steps.comprobar.outputs.hay == 'si'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiktok-${{ github.run_number }}
+          path: salida_tiktok/
+          retention-days: 14
