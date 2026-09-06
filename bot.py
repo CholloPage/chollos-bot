@@ -341,6 +341,73 @@ def generar(oferta: dict, destino: str, foto=None) -> str:
     return destino
 
 
+def generar_historia(oferta: dict, foto, destino: str) -> str:
+    """Version vertical 1080x1920 para historias de Instagram.
+
+    Ojo: Meta no permite anadir el sticker de enlace por API, asi que la
+    historia sale sin enlace clicable. Por eso el pie empuja a la bio.
+    """
+    AL = 1920
+    img = Image.new("RGB", (LADO, AL), FONDO)
+    dib = ImageDraw.Draw(img)
+    for y in range(AL):
+        f = y / AL
+        dib.line([(0, y), (LADO, y)],
+                 fill=(int(17 + 16 * f), int(20 + 14 * f), int(28 + 24 * f)))
+
+    pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
+
+    _centrar(dib, 150, MARCA.upper(), _fuente(34), APAGADO)
+
+    caja = (90, 300, 990, 1160)
+    dib.rounded_rectangle(caja, radius=32, fill=(255, 255, 255))
+    if foto is not None:
+        hueco_an, hueco_al = caja[2] - caja[0] - 90, caja[3] - caja[1] - 90
+        producto = foto.copy()
+        producto.thumbnail((hueco_an, hueco_al), Image.LANCZOS)
+        img.paste(producto, (caja[0] + (caja[2] - caja[0] - producto.width) // 2,
+                             caja[1] + (caja[3] - caja[1] - producto.height) // 2))
+
+    if pct:
+        f_pct = _fuente(72)
+        etiqueta = f"-{pct}%"
+        an = _ancho(dib, etiqueta, f_pct)
+        dib.rounded_rectangle([(LADO - an - 160, 240), (LADO - 60, 372)],
+                              radius=28, fill=ACENTO)
+        dib.text((LADO - an - 110, 264), etiqueta, font=f_pct, fill=FONDO)
+
+    titulo = oferta["titulo"]
+    f_tit = _fuente(46)
+    while _ancho(dib, titulo, f_tit) > LADO - 140 and len(titulo) > 12:
+        titulo = titulo[:-2].rstrip()
+    if titulo != oferta["titulo"]:
+        titulo = titulo.rsplit(" ", 1)[0] + "..."
+    _centrar(dib, 1240, titulo, f_tit, TEXTO)
+
+    f_ahora = _fuente(110)
+    ahora = f"{oferta['precio_ahora']:.2f} EUR"
+    if pct:
+        f_antes = _fuente(52, negrita=False)
+        antes = f"{oferta['precio_antes']:.2f} EUR"
+        a1, a2 = _ancho(dib, ahora, f_ahora), _ancho(dib, antes, f_antes)
+        x = (LADO - (a1 + 32 + a2)) / 2
+        dib.text((x, 1340), ahora, font=f_ahora, fill=ACENTO)
+        xa = x + a1 + 32
+        dib.text((xa, 1392), antes, font=f_antes, fill=APAGADO)
+        dib.line([(xa - 6, 1422), (xa + a2 + 6, 1422)], fill=APAGADO, width=4)
+    else:
+        _centrar(dib, 1340, ahora, f_ahora, ACENTO)
+
+    dib.line([(LADO / 2 - 70, 1660), (LADO / 2, 1590), (LADO / 2 + 70, 1660)],
+             fill=ACENTO, width=22, joint="curve")
+    _centrar(dib, 1700, "ENLACE EN LA BIO", _fuente(44), ACENTO)
+    _centrar(dib, 1810, "PUBLICIDAD  ·  ENLACE DE AFILIADO",
+             _fuente(28, negrita=False), APAGADO)
+
+    os.makedirs(os.path.dirname(destino), exist_ok=True)
+    img.save(destino, "JPEG", quality=88, optimize=True)
+    return destino
+
 # ======================================================================
 # PUBLICACION EN FACEBOOK E INSTAGRAM
 #
@@ -479,6 +546,28 @@ def publicar_instagram(urls_imagen: list, texto: str) -> str:
     )
     return _comprobar(publicacion)["id"]
 
+
+def publicar_historia_instagram(url_imagen: str) -> str:
+    """Historia de Instagram: dura 24 horas y no admite pie de texto.
+    El sticker de enlace hay que ponerlo a mano desde la app, porque Meta
+    no lo expone por API."""
+    creacion = requests.post(
+        f"{_base()}/{IG_USER_ID}/media",
+        data={
+            "image_url": url_imagen,
+            "media_type": "STORIES",
+            "access_token": META_TOKEN,
+        },
+        timeout=TIEMPO_ESPERA,
+    )
+    contenedor = _comprobar(creacion)["id"]
+    _esperar_contenedor(contenedor)
+    publicacion = requests.post(
+        f"{_base()}/{IG_USER_ID}/media_publish",
+        data={"creation_id": contenedor, "access_token": META_TOKEN},
+        timeout=TIEMPO_ESPERA,
+    )
+    return _comprobar(publicacion)["id"]
 
 # ======================================================================
 # PAGINA LINK-IN-BIO
@@ -721,8 +810,13 @@ def preparar() -> int:
         generar(oferta, ruta)
         print(f"Sin foto (ni imagenes/<ASIN> ni imagen_url): tarjeta de precio {nombre}")
 
+    nombre_historia = f"{marca_tiempo}-{oferta['asin']}-historia.jpg"
+    generar_historia(oferta, foto, os.path.join(DIR_IMG, nombre_historia))
+    print(f"Historia vertical: {nombre_historia}")
+
     with open(RUTA_PENDIENTE, "w", encoding="utf-8") as f:
-        json.dump({"oferta": oferta, "imagenes": [nombre]}, f, ensure_ascii=False, indent=2)
+        json.dump({"oferta": oferta, "imagenes": [nombre], "historia": nombre_historia},
+                  f, ensure_ascii=False, indent=2)
     return 0
 
 
@@ -734,10 +828,11 @@ def publicar() -> int:
     with open(RUTA_PENDIENTE, encoding="utf-8") as f:
         pendiente = json.load(f)
     oferta, nombres = pendiente["oferta"], pendiente["imagenes"]
+    nombre_historia = pendiente.get("historia")
 
     # Paquete de TikTok: eso lo publicas tu a mano desde el movil
     os.makedirs(DIR_TIKTOK, exist_ok=True)
-    for nombre in nombres:
+    for nombre in nombres + ([nombre_historia] if nombre_historia else []):
         shutil.copy(os.path.join(DIR_IMG, nombre), os.path.join(DIR_TIKTOK, nombre))
     with open(os.path.join(DIR_TIKTOK, "texto.txt"), "w", encoding="utf-8") as f:
         f.write(texto_tiktok(oferta))
@@ -759,6 +854,13 @@ def publicar() -> int:
             print(f"Instagram publicado: {publicar_instagram(urls, texto_instagram(oferta))}")
         except Exception as e:
             print(f"AVISO Instagram fallo: {e}")
+        if nombre_historia:
+            try:
+                url_h = f"{_base_imagenes()}/{nombre_historia}"
+                _esperar_url(url_h)
+                print(f"Historia publicada: {publicar_historia_instagram(url_h)}")
+            except Exception as e:
+                print(f"AVISO la historia fallo: {e}")
 
     estado = _leer_estado()
     estado.setdefault("publicadas", []).append({
