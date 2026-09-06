@@ -7,7 +7,8 @@
 <meta name="description" content="Los ultimos chollos de Amazon, actualizados cada dos horas.">
 <style>
   :root {
-    --fondo: #0f1218; --texto: #f2f4f8; --apagado: #99a1b3; --acento: #ffd63d;
+    --fondo: #0f1218; --tarjeta: #171b24; --borde: #262c38;
+    --texto: #f2f4f8; --apagado: #99a1b3; --acento: #ffd63d;
   }
   * { box-sizing: border-box; }
   body {
@@ -24,9 +25,35 @@
     background: rgba(255,214,61,.08); border: 1px solid rgba(255,214,61,.22);
     color: var(--apagado); font-size: 13px; line-height: 1.5;
   }
+  a.oferta {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--tarjeta); border: 1px solid var(--borde);
+    border-radius: 16px; padding: 16px; margin-bottom: 12px;
+    transition: border-color .15s ease, transform .15s ease;
+  }
+  a.oferta:hover { border-color: var(--acento); transform: translateY(-2px); }
+  .fila { display: flex; gap: 14px; align-items: center; }
+  .miniatura {
+    width: 76px; height: 76px; border-radius: 10px; object-fit: cover;
+    flex: 0 0 auto; background: var(--fondo);
+  }
+  .titulo { font-weight: 600; font-size: 15px; margin: 0 0 6px; }
+  .precios { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .ahora { color: var(--acento); font-weight: 700; font-size: 18px; }
+  .antes { color: var(--apagado); text-decoration: line-through; font-size: 13px; }
+  .pct {
+    background: var(--acento); color: #0f1218; font-weight: 700;
+    font-size: 12px; padding: 2px 7px; border-radius: 999px;
+  }
+  .cuando { color: var(--apagado); font-size: 12px; margin-top: 8px; }
+  footer { text-align: center; color: var(--apagado); font-size: 12px; margin-top: 28px; }
   .vacio { text-align: center; color: var(--apagado); padding: 40px 0; }
   @media (prefers-color-scheme: light) {
-    :root { --fondo: #f6f7fa; --texto: #12161f; --apagado: #626b7d; --acento: #b07d00; }
+    :root {
+      --fondo: #f6f7fa; --tarjeta: #ffffff; --borde: #e2e6ee;
+      --texto: #12161f; --apagado: #626b7d; --acento: #b07d00;
+    }
+    .pct { color: #fff; }
   }
 </style>
 </head>
@@ -38,7 +65,21 @@
   </header>
   <p class="aviso">Como afiliado de Amazon, gano una comision por las compras
   que cumplan los requisitos. No te cuesta nada de mas.</p>
-  <p class="vacio">Todavia no hay ofertas publicadas.</p>
+    <a class="oferta" href="https://www.amazon.es/dp/B0DSLBN5FS?tag=rodpack-21&amp;linkCode=ll1" target="_blank" rel="nofollow sponsored noopener">
+    <div class="fila">
+      <img class="miniatura" src="img/20260906-2035-B0DSLBN5FS.jpg" alt="" loading="lazy">
+      <div>
+        <p class="titulo">Robot aspirador Roborock QV 35A</p>
+        <div class="precios">
+          <span class="ahora">299.98 EUR</span>
+          <span class="antes">599.99 EUR</span><span class="pct">-50%</span>
+        </div>
+      </div>
+    </div>
+    <div class="cuando">Publicado el 2026-09-06 20:36</div>
+  </a>
+
+  <footer>Ultima actualizacion: 06/09/2026 a las 22:36 (hora peninsular)</footer>
 </div>
 </body>
 </html>
