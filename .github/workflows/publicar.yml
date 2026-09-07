@@ -38,6 +38,15 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      # El cron salta en punto, pero publicar siempre a las 10:00 clavadas
+      # canta a bot. Esperamos un rato al azar para repartir las horas.
+      - name: Esperar un rato al azar
+        if: github.event_name == 'schedule'
+        run: |
+          ESPERA=$((RANDOM % 3300))
+          echo "Esperando $ESPERA segundos para no publicar siempre en punto."
+          sleep $ESPERA
+
       - name: Preparar la oferta
         run: python bot.py preparar
 
