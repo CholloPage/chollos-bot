@@ -11,10 +11,12 @@
     {
       "asin": "B0H7J27HPD",
       "titulo": "Huawei Watch GT 7 46mm",
-      "precio_ahora": 249.0,
-      "precio_antes": 299.0,
+      "precio_ahora": 249,
+      "precio_antes": 299,
       "imagen": "img/20260907-1210-B0H7J27HPD.jpg",
-      "fecha": "2026-09-07T12:11:25+00:00"
+      "fecha": "2026-09-07T12:11:25+00:00",
+      "historia": "img/20260907-1210-B0H7J27HPD-historia.jpg",
+      "texto_tiktok": "Huawei Watch GT 7 46mm por 249.00 EUR (-17%)\nEnlace en la bio.\nEnlace de afiliado: si compras, gano una pequena comision sin coste extra para ti.\n#chollos #ofertas #tecnologia #gadgets #amazon"
     },
     {
       "asin": "B0F3PCN8T2",
