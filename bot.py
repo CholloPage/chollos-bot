@@ -274,15 +274,24 @@ def generar_foto(oferta: dict, foto, destino: str) -> str:
     _centrar(dib, 782, titulo, f_tit, TEXTO)
 
     # Precio actual y precio anterior tachado, centrados como un bloque
-    f_ahora = _fuente(76)
     ahora = f"{oferta['precio_ahora']:.2f} EUR"
+    antes = f"PVP {oferta['precio_antes']:.2f} EUR"
+    hueco = 26
+
+    # Buscamos el cuerpo mas grande con el que el bloque entero quepa.
+    tam = 76
+    while tam > 44:
+        f_ahora = _fuente(tam)
+        f_antes = _fuente(int(tam * 0.53), negrita=False)
+        total = _ancho(dib, ahora, f_ahora) + hueco + (_ancho(dib, antes, f_antes) if pct else 0)
+        if total <= LADO - 90:
+            break
+        tam -= 4
+
     an_ahora = _ancho(dib, ahora, f_ahora)
 
     if pct:
-        f_antes = _fuente(40, negrita=False)
-        antes = f"PVP {oferta['precio_antes']:.2f} EUR"
         an_antes = _ancho(dib, antes, f_antes)
-        hueco = 26
         x = (LADO - (an_ahora + hueco + an_antes)) / 2
         dib.text((x, 840), ahora, font=f_ahora, fill=ACENTO)
         x_antes = x + an_ahora + hueco
@@ -384,19 +393,18 @@ def generar_historia(oferta: dict, foto, destino: str) -> str:
         titulo = titulo.rsplit(" ", 1)[0] + "..."
     _centrar(dib, 1240, titulo, f_tit, TEXTO)
 
+    # En vertical hay sitio de sobra, asi que el PVP va debajo y centrado:
+    # al lado se salia de la imagen.
     f_ahora = _fuente(110)
     ahora = f"{oferta['precio_ahora']:.2f} EUR"
+    _centrar(dib, 1315, ahora, f_ahora, ACENTO)
     if pct:
-        f_antes = _fuente(52, negrita=False)
+        f_antes = _fuente(50, negrita=False)
         antes = f"PVP {oferta['precio_antes']:.2f} EUR"
-        a1, a2 = _ancho(dib, ahora, f_ahora), _ancho(dib, antes, f_antes)
-        x = (LADO - (a1 + 32 + a2)) / 2
-        dib.text((x, 1340), ahora, font=f_ahora, fill=ACENTO)
-        xa = x + a1 + 32
-        dib.text((xa, 1392), antes, font=f_antes, fill=APAGADO)
-        dib.line([(xa - 6, 1422), (xa + a2 + 6, 1422)], fill=APAGADO, width=4)
-    else:
-        _centrar(dib, 1340, ahora, f_ahora, ACENTO)
+        an = _ancho(dib, antes, f_antes)
+        x = (LADO - an) / 2
+        dib.text((x, 1462), antes, font=f_antes, fill=APAGADO)
+        dib.line([(x, 1494), (x + an, 1494)], fill=APAGADO, width=4)
 
     dib.line([(LADO / 2 - 70, 1660), (LADO / 2, 1590), (LADO / 2 + 70, 1660)],
              fill=ACENTO, width=22, joint="curve")
@@ -704,6 +712,142 @@ def regenerar(ruta_estado: str = "estado.json", destino: str = "docs/index.html"
     return destino
 
 
+PLANTILLA_TIKTOK = """<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{marca} · para TikTok</title>
+<meta name="robots" content="noindex">
+<style>
+  :root {{
+    --fondo: #0f1218; --tarjeta: #171b24; --borde: #262c38;
+    --texto: #f2f4f8; --apagado: #99a1b3; --acento: #ffd63d;
+  }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    margin: 0; padding: 26px 16px 70px;
+    background: var(--fondo); color: var(--texto);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }}
+  .envoltorio {{ max-width: 560px; margin: 0 auto; }}
+  h1 {{ font-size: 22px; margin: 0 0 4px; }}
+  .lema {{ color: var(--apagado); font-size: 14px; margin: 0 0 20px; }}
+  .como {{
+    background: rgba(255,214,61,.08); border: 1px solid rgba(255,214,61,.22);
+    border-radius: 12px; padding: 12px 14px; margin-bottom: 22px;
+    font-size: 13.5px; color: var(--apagado); line-height: 1.5;
+  }}
+  .como b {{ color: var(--texto); }}
+  article {{
+    background: var(--tarjeta); border: 1px solid var(--borde);
+    border-radius: 16px; padding: 14px; margin-bottom: 14px;
+    display: flex; gap: 14px; align-items: flex-start;
+  }}
+  article img {{
+    width: 92px; border-radius: 8px; display: block; background: var(--fondo);
+  }}
+  .cuerpo {{ flex: 1; min-width: 0; }}
+  .titulo {{ font-weight: 600; font-size: 15px; margin: 0 0 2px; }}
+  .precio {{ color: var(--acento); font-weight: 700; font-size: 15px; margin: 0 0 10px; }}
+  pre {{
+    background: var(--fondo); border: 1px solid var(--borde); border-radius: 8px;
+    padding: 10px; margin: 0 0 10px; font-size: 12px; line-height: 1.45;
+    white-space: pre-wrap; word-break: break-word; color: var(--apagado);
+    max-height: 132px; overflow: auto;
+  }}
+  button {{
+    background: var(--acento); color: #0f1218; border: 0; border-radius: 999px;
+    padding: 9px 16px; font-size: 13.5px; font-weight: 700; cursor: pointer;
+    font-family: inherit;
+  }}
+  button:active {{ transform: translateY(1px); }}
+  .vacio {{ color: var(--apagado); text-align: center; padding: 40px 0; }}
+  footer {{ color: var(--apagado); font-size: 12px; text-align: center; margin-top: 26px; }}
+  @media (prefers-color-scheme: light) {{
+    :root {{
+      --fondo: #f6f7fa; --tarjeta: #ffffff; --borde: #e2e6ee;
+      --texto: #12161f; --apagado: #626b7d; --acento: #b07d00;
+    }}
+    button {{ color: #fff; }}
+  }}
+</style>
+</head>
+<body>
+<div class="envoltorio">
+  <h1>{marca} · para TikTok</h1>
+  <p class="lema">Los verticales de las ultimas ofertas, listos para subir.</p>
+  <p class="como">Desde el movil: <b>pulsa la imagen</b> para abrirla a tamano completo,
+  mantenla pulsada y guardala en Fotos. Luego <b>Copiar texto</b>, abres TikTok, subes la
+  foto, pegas el texto y le pones un sonido de tendencia. El sonido es lo que hace que
+  llegue a gente, asi que no lo saltes.</p>
+  {tarjetas}
+  <footer>Actualizado el {actualizado}</footer>
+</div>
+<script>
+document.addEventListener("click", function (ev) {{
+  const b = ev.target.closest("button[data-destino]");
+  if (!b) return;
+  const t = document.getElementById(b.dataset.destino).textContent;
+  navigator.clipboard.writeText(t).then(function () {{
+    const antes = b.textContent;
+    b.textContent = "Copiado";
+    setTimeout(function () {{ b.textContent = antes; }}, 1600);
+  }});
+}});
+</script>
+</body>
+</html>
+"""
+
+TARJETA_TIKTOK = """  <article>
+    <a href="{imagen}" target="_blank" rel="noopener"><img src="{imagen}" alt="" loading="lazy"></a>
+    <div class="cuerpo">
+      <p class="titulo">{titulo}</p>
+      <p class="precio">{precio} EUR</p>
+      <pre id="texto{i}">{texto}</pre>
+      <button data-destino="texto{i}">Copiar texto</button>
+    </div>
+  </article>
+"""
+
+
+def regenerar_tiktok(ruta_estado: str = "estado.json",
+                     destino: str = "docs/tiktok.html") -> str:
+    """Pagina privada para el movil con los verticales y sus textos.
+
+    No es para tu publico: es tu bandeja de subida. TikTok no permite
+    publicar en publico por API sin pasar su auditoria, asi que esto
+    reduce el trabajo a guardar la foto y pegar el texto.
+    """
+    estado = _leer_estado(ruta_estado)
+    entradas = [e for e in reversed(estado.get("publicadas", [])) if e.get("historia")][:10]
+
+    tarjetas = []
+    for i, e in enumerate(entradas):
+        tarjetas.append(
+            TARJETA_TIKTOK.format(
+                i=i,
+                imagen=html.escape(e["historia"], quote=True),
+                titulo=html.escape(e["titulo"]),
+                precio=f'{e["precio_ahora"]:.2f}',
+                texto=html.escape(e.get("texto_tiktok", "")),
+            )
+        )
+
+    if not tarjetas:
+        tarjetas = ['  <p class="vacio">Todavia no hay verticales.</p>']
+
+    pagina = PLANTILLA_TIKTOK.format(
+        marca=html.escape(MARCA),
+        tarjetas="\n".join(tarjetas),
+        actualizado=datetime.now(ZoneInfo("Europe/Madrid")).strftime("%d/%m/%Y a las %H:%M"),
+    )
+    os.makedirs(os.path.dirname(destino), exist_ok=True)
+    with open(destino, "w", encoding="utf-8") as f:
+        f.write(pagina)
+    return destino
+
 # ======================================================================
 # ORQUESTADOR
 #
@@ -869,11 +1013,14 @@ def publicar() -> int:
         "precio_ahora": oferta["precio_ahora"],
         "precio_antes": oferta["precio_antes"],
         "imagen": f"img/{nombres[0]}",
+        "historia": f"img/{nombre_historia}" if nombre_historia else "",
+        "texto_tiktok": texto_tiktok(oferta),
         "fecha": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     })
     _guardar_estado(estado)
     regenerar(RUTA_ESTADO, "docs/index.html")
-    print("Pagina de bio regenerada con la oferta nueva arriba del todo.")
+    regenerar_tiktok(RUTA_ESTADO, "docs/tiktok.html")
+    print("Paginas de bio y de TikTok regeneradas.")
 
     os.remove(RUTA_PENDIENTE)
     return 0
