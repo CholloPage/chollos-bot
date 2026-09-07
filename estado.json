@@ -7,6 +7,14 @@
       "precio_antes": 599.99,
       "imagen": "img/20260906-2035-B0DSLBN5FS.jpg",
       "fecha": "2026-09-06T20:36:10+00:00"
+    },
+    {
+      "asin": "B0H7J27HPD",
+      "titulo": "Huawei Watch GT 7 46mm",
+      "precio_ahora": 249.0,
+      "precio_antes": 299.0,
+      "imagen": "img/20260907-1210-B0H7J27HPD.jpg",
+      "fecha": "2026-09-07T12:11:25+00:00"
     }
   ]
 }
