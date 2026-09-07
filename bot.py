@@ -849,6 +849,255 @@ def regenerar_tiktok(ruta_estado: str = "estado.json",
     return destino
 
 # ======================================================================
+# SITIO SEO: una ficha por oferta, archivo y sitemap
+#
+# Es el unico canal que acumula: una ficha de hace tres meses te sigue
+# trayendo gente de Google, mientras que un post se evapora en un dia.
+# Y en tu propia web los enlaces de afiliado no los discute nadie,
+# siempre que la divulgacion este a la vista.
+# ======================================================================
+
+CABECERA_SEO = """<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{titulo_seo}</title>
+<meta name="description" content="{descripcion}">
+<link rel="canonical" href="{canonica}">
+<meta property="og:type" content="{og_tipo}">
+<meta property="og:title" content="{titulo_seo}">
+<meta property="og:description" content="{descripcion}">
+<meta property="og:url" content="{canonica}">
+<meta property="og:image" content="{og_imagen}">
+<meta property="og:site_name" content="{marca}">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  :root {{
+    --fondo: #0f1218; --tarjeta: #171b24; --borde: #262c38;
+    --texto: #f2f4f8; --apagado: #99a1b3; --acento: #ffd63d;
+  }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    margin: 0; padding: 28px 18px 70px;
+    background: var(--fondo); color: var(--texto);
+    font: 16.5px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }}
+  .envoltorio {{ max-width: 640px; margin: 0 auto; }}
+  a {{ color: var(--acento); }}
+  .migas {{ font-size: 13px; color: var(--apagado); margin-bottom: 18px; }}
+  .migas a {{ color: var(--apagado); }}
+  h1 {{ font-size: 27px; line-height: 1.25; margin: 0 0 14px; }}
+  h2 {{ font-size: 19px; margin: 34px 0 12px; }}
+  .aviso {{
+    background: rgba(255,214,61,.08); border: 1px solid rgba(255,214,61,.22);
+    border-radius: 12px; padding: 12px 14px; color: var(--apagado);
+    font-size: 13.5px; line-height: 1.5; margin: 26px 0;
+  }}
+  figure {{ margin: 0 0 22px; }}
+  figure img {{ width: 100%; border-radius: 14px; display: block; }}
+  .precios {{ display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; margin: 0 0 6px; }}
+  .ahora {{ color: var(--acento); font-weight: 800; font-size: 34px; }}
+  .antes {{ color: var(--apagado); text-decoration: line-through; font-size: 17px; }}
+  .pct {{
+    background: var(--acento); color: #0f1218; font-weight: 800;
+    font-size: 13px; padding: 3px 9px; border-radius: 999px;
+  }}
+  .fecha {{ color: var(--apagado); font-size: 13.5px; margin: 0 0 22px; }}
+  .boton {{
+    display: block; text-align: center; text-decoration: none;
+    background: var(--acento); color: #0f1218; font-weight: 800; font-size: 17px;
+    padding: 16px; border-radius: 14px; margin: 0 0 12px;
+  }}
+  ul.lista {{ padding-left: 20px; }}
+  ul.lista li {{ margin-bottom: 7px; }}
+  article.item {{
+    background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 14px;
+    padding: 13px; margin-bottom: 11px; display: flex; gap: 13px; align-items: center;
+  }}
+  article.item img {{ width: 74px; height: 74px; object-fit: cover; border-radius: 9px; }}
+  article.item a {{ text-decoration: none; color: var(--texto); font-weight: 600; font-size: 15.5px; }}
+  article.item .p {{ color: var(--acento); font-weight: 700; font-size: 15px; }}
+  footer {{ margin-top: 40px; color: var(--apagado); font-size: 13px; }}
+  @media (prefers-color-scheme: light) {{
+    :root {{
+      --fondo: #f6f7fa; --tarjeta: #ffffff; --borde: #e2e6ee;
+      --texto: #12161f; --apagado: #626b7d; --acento: #b07d00;
+    }}
+    .pct, .boton {{ color: #fff; }}
+  }}
+</style>
+{extra}
+</head>
+<body>
+<div class="envoltorio">
+"""
+
+PIE_SEO = """  <footer>
+    <p><a href="{raiz}/">{marca}</a> · <a href="{raiz}/ofertas.html">Todas las ofertas</a></p>
+    <p>Como afiliado de Amazon, gano una comision por las compras que cumplan los
+    requisitos. El precio que ves es el que tenia el producto cuando lo publicamos:
+    Amazon puede cambiarlo en cualquier momento, asi que comprueba siempre el precio
+    final en su pagina antes de comprar.</p>
+  </footer>
+</div>
+</body>
+</html>
+"""
+
+
+def _slug(texto: str) -> str:
+    """Convierte un titulo en algo apto para una URL."""
+    import unicodedata
+    t = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+    t = "".join(c.lower() if c.isalnum() else "-" for c in t)
+    while "--" in t:
+        t = t.replace("--", "-")
+    return t.strip("-")[:60] or "oferta"
+
+
+def _raiz() -> str:
+    return PAGES_URL.rstrip("/") if PAGES_URL else ""
+
+
+def ruta_ficha(e: dict) -> str:
+    return f'oferta/{e["asin"]}-{_slug(e["titulo"])}.html'
+
+
+def _ficha(e: dict) -> str:
+    """Una ficha por oferta, con datos estructurados para Google."""
+    pct = descuento(e["precio_ahora"], e.get("precio_antes") or 0)
+    raiz = _raiz()
+    canonica = f'{raiz}/{ruta_ficha(e)}'
+    imagen = f'{raiz}/{e.get("imagen", "")}'
+    fecha = e.get("fecha", "")[:10]
+
+    titulo_seo = f'{e["titulo"]} por {e["precio_ahora"]:.2f} EUR'
+    if pct:
+        titulo_seo += f' (-{pct}%)'
+    titulo_seo += f' | {MARCA}'
+
+    descripcion = (
+        f'{e["titulo"]} a {e["precio_ahora"]:.2f} EUR'
+        + (f', frente a los {e["precio_antes"]:.2f} EUR de PVP (-{pct}%).' if pct else '.')
+        + f' Precio comprobado el {fecha}.'
+    )
+
+    datos = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": e["titulo"],
+        "image": imagen,
+        "offers": {
+            "@type": "Offer",
+            "price": f'{e["precio_ahora"]:.2f}',
+            "priceCurrency": "EUR",
+            "availability": "https://schema.org/InStock",
+            "url": enlace_afiliado(e["asin"]),
+        },
+    }
+    extra = ('<script type="application/ld+json">'
+             + json.dumps(datos, ensure_ascii=False) + '</script>')
+
+    bloque_antes = ""
+    if pct:
+        bloque_antes = (f'<span class="antes">PVP {e["precio_antes"]:.2f} EUR</span>'
+                        f'<span class="pct">-{pct}%</span>')
+
+    cuerpo = f"""  <p class="migas"><a href="{raiz}/">{html.escape(MARCA)}</a> ·
+  <a href="{raiz}/ofertas.html">Ofertas</a></p>
+  <h1>{html.escape(e["titulo"])}</h1>
+  <figure><img src="{html.escape(imagen, quote=True)}" alt="{html.escape(e["titulo"], quote=True)}"></figure>
+  <div class="precios"><span class="ahora">{e["precio_ahora"]:.2f} EUR</span>{bloque_antes}</div>
+  <p class="fecha">Precio comprobado el {fecha}.</p>
+  <a class="boton" href="{html.escape(enlace_afiliado(e["asin"]), quote=True)}"
+     target="_blank" rel="nofollow sponsored noopener">Ver el precio en Amazon</a>
+  <div class="aviso">Enlace de afiliado. Si compras a traves de el, gano una pequena
+  comision y a ti no te cuesta nada de mas.</div>
+  <h2>Antes de comprar</h2>
+  <ul class="lista">
+    <li>El PVP es el precio recomendado que muestra la ficha del producto, no
+    necesariamente lo que costaba la semana pasada.</li>
+    <li>Amazon cambia precios a lo largo del dia. Comprueba el importe final antes de pagar.</li>
+    <li>Publicamos el precio del dia {fecha}; si has llegado aqui mucho despues, es
+    probable que haya cambiado.</li>
+  </ul>
+"""
+    return (CABECERA_SEO.format(titulo_seo=html.escape(titulo_seo, quote=True),
+                                descripcion=html.escape(descripcion, quote=True),
+                                canonica=html.escape(canonica, quote=True),
+                                og_imagen=html.escape(imagen, quote=True),
+                                og_tipo="article", marca=html.escape(MARCA), extra=extra)
+            + cuerpo + PIE_SEO.format(raiz=raiz, marca=html.escape(MARCA)))
+
+
+def _archivo(entradas: list) -> str:
+    raiz = _raiz()
+    filas = []
+    for e in entradas:
+        pct = descuento(e["precio_ahora"], e.get("precio_antes") or 0)
+        filas.append(f"""  <article class="item">
+    <img src="{html.escape(raiz + "/" + e.get("imagen", ""), quote=True)}" alt="" loading="lazy">
+    <div>
+      <a href="{html.escape(raiz + "/" + ruta_ficha(e), quote=True)}">{html.escape(e["titulo"])}</a>
+      <div class="p">{e["precio_ahora"]:.2f} EUR{f" · -{pct}%" if pct else ""}</div>
+    </div>
+  </article>""")
+    cuerpo = (f'  <h1>Todas las ofertas de {html.escape(MARCA)}</h1>\n'
+              f'  <p class="fecha">Chollos de Amazon publicados hasta hoy, con el precio '
+              f'que tenian el dia de la publicacion.</p>\n' + "\n".join(filas) + "\n")
+    return (CABECERA_SEO.format(
+                titulo_seo=html.escape(f"Todas las ofertas | {MARCA}", quote=True),
+                descripcion=html.escape(
+                    f"Listado de todos los chollos de Amazon publicados en {MARCA}.", quote=True),
+                canonica=html.escape(f"{raiz}/ofertas.html", quote=True),
+                og_imagen="", og_tipo="website", marca=html.escape(MARCA), extra="")
+            + cuerpo + PIE_SEO.format(raiz=raiz, marca=html.escape(MARCA)))
+
+
+def regenerar_seo(ruta_estado: str = "estado.json", dir_docs: str = "docs") -> int:
+    """Reescribe todas las fichas, el archivo, el sitemap y el robots.
+
+    Se regenera todo cada vez a proposito: asi un cambio de plantilla
+    alcanza tambien a las fichas viejas.
+    """
+    raiz = _raiz()
+    if not raiz:
+        print("AVISO sin PAGES_URL no se puede generar el sitio SEO.")
+        return 0
+
+    estado = _leer_estado(ruta_estado)
+    entradas = list(reversed(estado.get("publicadas", [])))
+    if not entradas:
+        return 0
+
+    os.makedirs(os.path.join(dir_docs, "oferta"), exist_ok=True)
+    for e in entradas:
+        destino = os.path.join(dir_docs, ruta_ficha(e))
+        with open(destino, "w", encoding="utf-8") as f:
+            f.write(_ficha(e))
+
+    with open(os.path.join(dir_docs, "ofertas.html"), "w", encoding="utf-8") as f:
+        f.write(_archivo(entradas))
+
+    urls = [f"{raiz}/", f"{raiz}/ofertas.html"] + [f"{raiz}/{ruta_ficha(e)}" for e in entradas]
+    fechas = ["", ""] + [e.get("fecha", "")[:10] for e in entradas]
+    cuerpo = "\n".join(
+        f"  <url><loc>{html.escape(u, quote=True)}</loc>"
+        + (f"<lastmod>{d}</lastmod>" if d else "") + "</url>"
+        for u, d in zip(urls, fechas))
+    with open(os.path.join(dir_docs, "sitemap.xml"), "w", encoding="utf-8") as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?>\n'
+                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                + cuerpo + "\n</urlset>\n")
+
+    with open(os.path.join(dir_docs, "robots.txt"), "w", encoding="utf-8") as f:
+        f.write(f"User-agent: *\nAllow: /\nDisallow: /tiktok.html\n\nSitemap: {raiz}/sitemap.xml\n")
+
+    print(f"Sitio SEO regenerado: {len(entradas)} fichas, archivo y sitemap.")
+    return len(entradas)
+
+# ======================================================================
 # ORQUESTADOR
 #
 # Dos fases, porque Instagram exige que la imagen ya este accesible en
@@ -1020,6 +1269,7 @@ def publicar() -> int:
     _guardar_estado(estado)
     regenerar(RUTA_ESTADO, "docs/index.html")
     regenerar_tiktok(RUTA_ESTADO, "docs/tiktok.html")
+    regenerar_seo(RUTA_ESTADO, "docs")
     print("Paginas de bio y de TikTok regeneradas.")
 
     os.remove(RUTA_PENDIENTE)
