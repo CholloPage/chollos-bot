@@ -106,7 +106,7 @@ def texto_facebook(oferta: dict) -> str:
     pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
     partes = [f"{random.choice(APERTURAS)}: {oferta['titulo']}"]
     if pct:
-        partes.append(f"{oferta['precio_ahora']:.2f} EUR en vez de {oferta['precio_antes']:.2f} EUR (-{pct}%)")
+        partes.append(f"{oferta['precio_ahora']:.2f} EUR en vez de los {oferta['precio_antes']:.2f} EUR de PVP (-{pct}%)")
     else:
         partes.append(f"{oferta['precio_ahora']:.2f} EUR")
     if oferta.get("gancho"):
@@ -122,7 +122,7 @@ def texto_instagram(oferta: dict) -> str:
     pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
     partes = [f"{random.choice(APERTURAS)}: {oferta['titulo']}"]
     if pct:
-        partes.append(f"{oferta['precio_ahora']:.2f} EUR en vez de {oferta['precio_antes']:.2f} EUR (-{pct}%)")
+        partes.append(f"{oferta['precio_ahora']:.2f} EUR en vez de los {oferta['precio_antes']:.2f} EUR de PVP (-{pct}%)")
     else:
         partes.append(f"{oferta['precio_ahora']:.2f} EUR")
     if oferta.get("gancho"):
@@ -280,7 +280,7 @@ def generar_foto(oferta: dict, foto, destino: str) -> str:
 
     if pct:
         f_antes = _fuente(40, negrita=False)
-        antes = f"{oferta['precio_antes']:.2f} EUR"
+        antes = f"PVP {oferta['precio_antes']:.2f} EUR"
         an_antes = _ancho(dib, antes, f_antes)
         hueco = 26
         x = (LADO - (an_ahora + hueco + an_antes)) / 2
@@ -326,7 +326,7 @@ def generar(oferta: dict, destino: str, foto=None) -> str:
 
     if pct:
         f_ant = _fuente(46, negrita=False)
-        antes = f"antes {oferta['precio_antes']:.2f} EUR"
+        antes = f"PVP {oferta['precio_antes']:.2f} EUR"
         an = _ancho(dib, antes, f_ant)
         x = (LADO - an) / 2
         dib.text((x, y + 190), antes, font=f_ant, fill=APAGADO)
@@ -388,7 +388,7 @@ def generar_historia(oferta: dict, foto, destino: str) -> str:
     ahora = f"{oferta['precio_ahora']:.2f} EUR"
     if pct:
         f_antes = _fuente(52, negrita=False)
-        antes = f"{oferta['precio_antes']:.2f} EUR"
+        antes = f"PVP {oferta['precio_antes']:.2f} EUR"
         a1, a2 = _ancho(dib, ahora, f_ahora), _ancho(dib, antes, f_antes)
         x = (LADO - (a1 + 32 + a2)) / 2
         dib.text((x, 1340), ahora, font=f_ahora, fill=ACENTO)
@@ -676,7 +676,7 @@ def regenerar(ruta_estado: str = "estado.json", destino: str = "docs/index.html"
         bloque_antes = ""
         if pct:
             bloque_antes = (
-                f'<span class="antes">{e["precio_antes"]:.2f} EUR</span>'
+                f'<span class="antes">PVP {e["precio_antes"]:.2f} EUR</span>'
                 f'<span class="pct">-{pct}%</span>'
             )
         tarjetas.append(
