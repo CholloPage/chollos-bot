@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /tiktok.html
+
+Sitemap: https://chollopage.github.io/chollos-bot/sitemap.xml
