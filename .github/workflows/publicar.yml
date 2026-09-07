@@ -76,7 +76,7 @@ jobs:
       - name: Guardar estado y pagina de bio
         if: steps.comprobar.outputs.hay == 'si'
         run: |
-          git add estado.json docs/index.html
+          git add estado.json docs
           git commit -m "Chollo publicado $(date -u +%Y-%m-%dT%H:%M)" || exit 0
           git push
 
