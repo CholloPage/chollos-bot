@@ -67,6 +67,14 @@ jobs:
           git config user.email "bot-chollos@users.noreply.github.com"
           git add docs/img
           git commit -m "Imagen de la oferta $(date -u +%Y-%m-%dT%H:%M)" || exit 0
+          # Si alguien (o yo mismo) ha tocado el repo mientras corriamos, el
+          # push se rechaza. Traemos lo de arriba y reintentamos en vez de
+          # tirar a la basura una ejecucion entera.
+          for intento in 1 2 3; do
+            if git push; then exit 0; fi
+            echo "Push rechazado. Reintento $intento tras traer los cambios."
+            git pull --rebase origin "$GITHUB_REF_NAME" || exit 1
+          done
           git push
 
       - name: Publicar en Facebook e Instagram
@@ -78,6 +86,14 @@ jobs:
         run: |
           git add estado.json docs
           git commit -m "Chollo publicado $(date -u +%Y-%m-%dT%H:%M)" || exit 0
+          # Si alguien (o yo mismo) ha tocado el repo mientras corriamos, el
+          # push se rechaza. Traemos lo de arriba y reintentamos en vez de
+          # tirar a la basura una ejecucion entera.
+          for intento in 1 2 3; do
+            if git push; then exit 0; fi
+            echo "Push rechazado. Reintento $intento tras traer los cambios."
+            git pull --rebase origin "$GITHUB_REF_NAME" || exit 1
+          done
           git push
 
       - name: Dejar el paquete de TikTok descargable
