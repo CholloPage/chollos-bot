@@ -454,30 +454,23 @@ def _comprobar(resp) -> dict:
 
 
 def publicar_facebook(urls_imagen: list, texto: str) -> str:
-    """Post en la Pagina. El enlace de afiliado va en el texto, que aqui
-    si es clicable."""
-    if len(urls_imagen) == 1:
-        resp = requests.post(
-            f"{_base()}/{FB_PAGE_ID}/photos",
-            data={
-                "url": urls_imagen[0],
-                "caption": texto,
-                "published": "true",
-                "access_token": META_TOKEN,
-            },
-            timeout=TIEMPO_ESPERA,
-        )
-        datos = _comprobar(resp)
-        return datos.get("post_id") or datos.get("id", "")
+    """Publica una entrada normal en el muro de la Pagina, con la foto
+    adjunta. El enlace de afiliado va en el texto, que aqui si es clicable.
 
+    Se sube la foto sin publicar y luego se adjunta a una entrada de /feed,
+    en vez de publicar directamente en /photos. Las dos formas salen en el
+    muro, pero /photos crea un objeto de tipo foto (la Pagina lo ensena como
+    una foto del album) y /feed crea una publicacion de verdad, igual que si
+    la escribieras tu desde el cuadro de publicar.
+    """
     ids = []
-    for url in urls_imagen:
+    for url in urls_imagen[:10]:
         subida = requests.post(
             f"{_base()}/{FB_PAGE_ID}/photos",
             data={
                 "url": url,
-                "published": "false",
-                "temporary": "true",
+                "published": "false",   # sin publicar: solo queda subida
+                "temporary": "true",    # y se descarta si no la adjuntamos
                 "access_token": META_TOKEN,
             },
             timeout=TIEMPO_ESPERA,
@@ -492,6 +485,7 @@ def publicar_facebook(urls_imagen: list, texto: str) -> str:
         f"{_base()}/{FB_PAGE_ID}/feed", data=datos_post, timeout=TIEMPO_ESPERA
     )
     return _comprobar(resp).get("id", "")
+
 
 
 def _esperar_contenedor(contenedor: str) -> None:
