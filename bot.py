@@ -87,6 +87,13 @@ HASHTAGS = {
 HASHTAGS_POR_DEFECTO = "#chollos #ofertas #amazon #descuentos"
 
 
+def referencia(oferta: dict) -> str:
+    """Como se llama el precio tachado. Amazon no siempre muestra un PVP:
+    unas fichas traen 'Precio recomendado', otras 'Precio mediano'. Poner
+    PVP donde no lo hay seria decir algo que no es cierto."""
+    return (oferta.get("referencia") or "PVP").strip()
+
+
 def descuento(precio_ahora: float, precio_antes: float) -> int:
     if not precio_antes or precio_antes <= precio_ahora:
         return 0
@@ -106,7 +113,7 @@ def texto_facebook(oferta: dict) -> str:
     pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
     partes = [f"{random.choice(APERTURAS)}: {oferta['titulo']}"]
     if pct:
-        partes.append(f"{oferta['precio_ahora']:.2f} EUR en vez de los {oferta['precio_antes']:.2f} EUR de PVP (-{pct}%)")
+        partes.append(f"{oferta['precio_ahora']:.2f} EUR en vez de {oferta['precio_antes']:.2f} EUR (-{pct}% sobre {referencia(oferta)})")
     else:
         partes.append(f"{oferta['precio_ahora']:.2f} EUR")
     if oferta.get("gancho"):
@@ -122,7 +129,7 @@ def texto_instagram(oferta: dict) -> str:
     pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
     partes = [f"{random.choice(APERTURAS)}: {oferta['titulo']}"]
     if pct:
-        partes.append(f"{oferta['precio_ahora']:.2f} EUR en vez de los {oferta['precio_antes']:.2f} EUR de PVP (-{pct}%)")
+        partes.append(f"{oferta['precio_ahora']:.2f} EUR en vez de {oferta['precio_antes']:.2f} EUR (-{pct}% sobre {referencia(oferta)})")
     else:
         partes.append(f"{oferta['precio_ahora']:.2f} EUR")
     if oferta.get("gancho"):
@@ -275,7 +282,7 @@ def generar_foto(oferta: dict, foto, destino: str) -> str:
 
     # Precio actual y precio anterior tachado, centrados como un bloque
     ahora = f"{oferta['precio_ahora']:.2f} EUR"
-    antes = f"PVP {oferta['precio_antes']:.2f} EUR"
+    antes = f"{referencia(oferta)} {oferta['precio_antes']:.2f} EUR"
     hueco = 26
 
     # Buscamos el cuerpo mas grande con el que el bloque entero quepa.
@@ -335,7 +342,7 @@ def generar(oferta: dict, destino: str, foto=None) -> str:
 
     if pct:
         f_ant = _fuente(46, negrita=False)
-        antes = f"PVP {oferta['precio_antes']:.2f} EUR"
+        antes = f"{referencia(oferta)} {oferta['precio_antes']:.2f} EUR"
         an = _ancho(dib, antes, f_ant)
         x = (LADO - an) / 2
         dib.text((x, y + 190), antes, font=f_ant, fill=APAGADO)
@@ -400,7 +407,7 @@ def generar_historia(oferta: dict, foto, destino: str) -> str:
     _centrar(dib, 1315, ahora, f_ahora, ACENTO)
     if pct:
         f_antes = _fuente(50, negrita=False)
-        antes = f"PVP {oferta['precio_antes']:.2f} EUR"
+        antes = f"{referencia(oferta)} {oferta['precio_antes']:.2f} EUR"
         an = _ancho(dib, antes, f_antes)
         x = (LADO - an) / 2
         dib.text((x, 1462), antes, font=f_antes, fill=APAGADO)
@@ -684,7 +691,7 @@ def regenerar(ruta_estado: str = "estado.json", destino: str = "docs/index.html"
         bloque_antes = ""
         if pct:
             bloque_antes = (
-                f'<span class="antes">PVP {e["precio_antes"]:.2f} EUR</span>'
+                f'<span class="antes">{referencia(e)} {e["precio_antes"]:.2f} EUR</span>'
                 f'<span class="pct">-{pct}%</span>'
             )
         tarjetas.append(
@@ -979,7 +986,7 @@ def _ficha(e: dict) -> str:
 
     descripcion = (
         f'{e["titulo"]} a {e["precio_ahora"]:.2f} EUR'
-        + (f', frente a los {e["precio_antes"]:.2f} EUR de PVP (-{pct}%).' if pct else '.')
+        + (f', frente a {e["precio_antes"]:.2f} EUR (-{pct}% sobre {referencia(e)}).' if pct else '.')
         + f' Precio comprobado el {fecha}.'
     )
 
@@ -1001,7 +1008,7 @@ def _ficha(e: dict) -> str:
 
     bloque_antes = ""
     if pct:
-        bloque_antes = (f'<span class="antes">PVP {e["precio_antes"]:.2f} EUR</span>'
+        bloque_antes = (f'<span class="antes">{referencia(e)} {e["precio_antes"]:.2f} EUR</span>'
                         f'<span class="pct">-{pct}%</span>')
 
     cuerpo = f"""  <p class="migas"><a href="{raiz}/">{html.escape(MARCA)}</a> ·
@@ -1016,8 +1023,8 @@ def _ficha(e: dict) -> str:
   comision y a ti no te cuesta nada de mas.</div>
   <h2>Antes de comprar</h2>
   <ul class="lista">
-    <li>El PVP es el precio recomendado que muestra la ficha del producto, no
-    necesariamente lo que costaba la semana pasada.</li>
+    <li>El precio tachado es la referencia que muestra la ficha de Amazon
+    ({html.escape(referencia(e))}), no necesariamente lo que costaba la semana pasada.</li>
     <li>Amazon cambia precios a lo largo del dia. Comprueba el importe final antes de pagar.</li>
     <li>Publicamos el precio del dia {fecha}; si has llegado aqui mucho despues, es
     probable que haya cambiado.</li>
@@ -1148,6 +1155,7 @@ def _leer_ofertas() -> list:
                 "categoria": (fila.get("categoria") or "").strip(),
                 "gancho": (fila.get("gancho") or "").strip(),
                 "imagen_url": (fila.get("imagen_url") or "").strip(),
+                "referencia": (fila.get("referencia") or "").strip(),
             })
     return ofertas
 
@@ -1263,6 +1271,7 @@ def publicar() -> int:
         "precio_antes": oferta["precio_antes"],
         "imagen": f"img/{nombres[0]}",
         "historia": f"img/{nombre_historia}" if nombre_historia else "",
+        "referencia": referencia(oferta),
         "texto_tiktok": texto_tiktok(oferta),
         "fecha": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     })
