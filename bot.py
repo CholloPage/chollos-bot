@@ -47,7 +47,7 @@ PAGES_URL = os.environ.get("PAGES_URL", "").rstrip("/")
 # En seco no se llama a ninguna API: genera imagen, copy y pagina, y para.
 EN_SECO = os.environ.get("EN_SECO", "0") == "1"
 # Cuantas ofertas se muestran en la pagina de bio
-BIO_MAX = int(os.environ.get("BIO_MAX", "12"))
+BIO_MAX = int(os.environ.get("BIO_MAX", "25"))
 
 MARCA = os.environ.get("MARCA", "CholloPage")
 
