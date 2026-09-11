@@ -4,7 +4,7 @@ on:
   schedule:
     # Cada 2 horas en punto (UTC). GitHub puede retrasarlo unos minutos
     # cuando hay cola; es normal y no rompe nada.
-    - cron: "0 */2 * * *"
+    - cron: "0 */1 * * *"
   workflow_dispatch: {}   # boton para lanzarlo a mano desde la pestana Actions
 
 permissions:
