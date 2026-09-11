@@ -47,7 +47,7 @@ PAGES_URL = os.environ.get("PAGES_URL", "").rstrip("/")
 # En seco no se llama a ninguna API: genera imagen, copy y pagina, y para.
 EN_SECO = os.environ.get("EN_SECO", "0") == "1"
 # Cuantas ofertas se muestran en la pagina de bio
-BIO_MAX = int(os.environ.get("BIO_MAX", "25"))
+BIO_MAX = int(os.environ.get("BIO_MAX", "100"))
 
 MARCA = os.environ.get("MARCA", "CholloPage")
 
@@ -979,8 +979,8 @@ def _ficha(e: dict) -> str:
     titulo_seo += f' | {MARCA}'
 
     descripcion = (
-        f'{e["titulo"]} a {e["precio_ahora"]:.2f} EUR'
-        + (f', frente a {e["precio_antes"]:.2f} EUR (-{pct}% sobre {referencia(e)}).' if pct else '.')
+        f'{e["titulo"]} a {e["precio_ahora"]:.2f} €'
+        + (f', frente a {e["precio_antes"]:.2f} € (-{pct}% sobre {referencia(e)}).' if pct else '.')
         + f' Precio comprobado el {fecha}.'
     )
 
