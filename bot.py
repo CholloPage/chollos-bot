@@ -113,9 +113,9 @@ def texto_facebook(oferta: dict) -> str:
     pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
     partes = [f"{random.choice(APERTURAS)}: {oferta['titulo']}"]
     if pct:
-        partes.append(f"{oferta['precio_ahora']:.2f} EUR en vez de {oferta['precio_antes']:.2f} EUR (-{pct}% sobre {referencia(oferta)})")
+        partes.append(f"{oferta['precio_ahora']:.2f} € en vez de {oferta['precio_antes']:.2f} € (-{pct}% sobre {referencia(oferta)})")
     else:
-        partes.append(f"{oferta['precio_ahora']:.2f} EUR")
+        partes.append(f"{oferta['precio_ahora']:.2f} €")
     if oferta.get("gancho"):
         partes.append(oferta["gancho"] + ".")
     partes.append(enlace_afiliado(oferta["asin"]))
@@ -129,9 +129,9 @@ def texto_instagram(oferta: dict) -> str:
     pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
     partes = [f"{random.choice(APERTURAS)}: {oferta['titulo']}"]
     if pct:
-        partes.append(f"{oferta['precio_ahora']:.2f} EUR en vez de {oferta['precio_antes']:.2f} EUR (-{pct}% sobre {referencia(oferta)})")
+        partes.append(f"{oferta['precio_ahora']:.2f} € en vez de {oferta['precio_antes']:.2f} € (-{pct}% sobre {referencia(oferta)})")
     else:
-        partes.append(f"{oferta['precio_ahora']:.2f} EUR")
+        partes.append(f"{oferta['precio_ahora']:.2f} €")
     if oferta.get("gancho"):
         partes.append(oferta["gancho"] + ".")
     partes.append(random.choice(CIERRES))
@@ -142,7 +142,7 @@ def texto_instagram(oferta: dict) -> str:
 
 def texto_tiktok(oferta: dict) -> str:
     pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
-    cabeza = f"{oferta['titulo']} por {oferta['precio_ahora']:.2f} EUR"
+    cabeza = f"{oferta['titulo']} por {oferta['precio_ahora']:.2f} €"
     if pct:
         cabeza += f" (-{pct}%)"
     return "\n".join([
@@ -281,8 +281,8 @@ def generar_foto(oferta: dict, foto, destino: str) -> str:
     _centrar(dib, 782, titulo, f_tit, TEXTO)
 
     # Precio actual y precio anterior tachado, centrados como un bloque
-    ahora = f"{oferta['precio_ahora']:.2f} EUR"
-    antes = f"{referencia(oferta)} {oferta['precio_antes']:.2f} EUR"
+    ahora = f"{oferta['precio_ahora']:.2f} €"
+    antes = f"{referencia(oferta)} {oferta['precio_antes']:.2f} €"
     hueco = 26
 
     # Buscamos el cuerpo mas grande con el que el bloque entero quepa.
@@ -338,11 +338,11 @@ def generar(oferta: dict, destino: str, foto=None) -> str:
         y += 76
 
     y = max(y + 50, 500)
-    _centrar(dib, y, f"{oferta['precio_ahora']:.2f} EUR", _fuente(140), ACENTO)
+    _centrar(dib, y, f"{oferta['precio_ahora']:.2f} €", _fuente(140), ACENTO)
 
     if pct:
         f_ant = _fuente(46, negrita=False)
-        antes = f"{referencia(oferta)} {oferta['precio_antes']:.2f} EUR"
+        antes = f"{referencia(oferta)} {oferta['precio_antes']:.2f} €"
         an = _ancho(dib, antes, f_ant)
         x = (LADO - an) / 2
         dib.text((x, y + 190), antes, font=f_ant, fill=APAGADO)
@@ -403,11 +403,11 @@ def generar_historia(oferta: dict, foto, destino: str) -> str:
     # En vertical hay sitio de sobra, asi que el PVP va debajo y centrado:
     # al lado se salia de la imagen.
     f_ahora = _fuente(110)
-    ahora = f"{oferta['precio_ahora']:.2f} EUR"
+    ahora = f"{oferta['precio_ahora']:.2f} €"
     _centrar(dib, 1315, ahora, f_ahora, ACENTO)
     if pct:
         f_antes = _fuente(50, negrita=False)
-        antes = f"{referencia(oferta)} {oferta['precio_antes']:.2f} EUR"
+        antes = f"{referencia(oferta)} {oferta['precio_antes']:.2f} €"
         an = _ancho(dib, antes, f_antes)
         x = (LADO - an) / 2
         dib.text((x, 1462), antes, font=f_antes, fill=APAGADO)
@@ -665,7 +665,7 @@ TARJETA = """  <a class="oferta" href="{enlace}" target="_blank" rel="nofollow s
       <div>
         <p class="titulo">{titulo}</p>
         <div class="precios">
-          <span class="ahora">{ahora} EUR</span>
+          <span class="ahora">{ahora} €</span>
           {bloque_antes}
         </div>
       </div>
@@ -685,7 +685,7 @@ def regenerar(ruta_estado: str = "estado.json", destino: str = "docs/index.html"
         bloque_antes = ""
         if pct:
             bloque_antes = (
-                f'<span class="antes">{referencia(e)} {e["precio_antes"]:.2f} EUR</span>'
+                f'<span class="antes">{referencia(e)} {e["precio_antes"]:.2f} €</span>'
                 f'<span class="pct">-{pct}%</span>'
             )
         tarjetas.append(
@@ -805,7 +805,7 @@ TARJETA_TIKTOK = """  <article>
     <a href="{imagen}" target="_blank" rel="noopener"><img src="{imagen}" alt="" loading="lazy"></a>
     <div class="cuerpo">
       <p class="titulo">{titulo}</p>
-      <p class="precio">{precio} EUR</p>
+      <p class="precio">{precio} €</p>
       <pre id="texto{i}">{texto}</pre>
       <button data-destino="texto{i}">Copiar texto</button>
     </div>
@@ -973,7 +973,7 @@ def _ficha(e: dict) -> str:
     imagen = f'{raiz}/{e.get("imagen", "")}'
     fecha = e.get("fecha", "")[:10]
 
-    titulo_seo = f'{e["titulo"]} por {e["precio_ahora"]:.2f} EUR'
+    titulo_seo = f'{e["titulo"]} por {e["precio_ahora"]:.2f} €'
     if pct:
         titulo_seo += f' (-{pct}%)'
     titulo_seo += f' | {MARCA}'
@@ -992,7 +992,7 @@ def _ficha(e: dict) -> str:
         "offers": {
             "@type": "Offer",
             "price": f'{e["precio_ahora"]:.2f}',
-            "priceCurrency": "EUR",
+            "priceCurrency": "€",
             "availability": "https://schema.org/InStock",
             "url": enlace_afiliado(e["asin"]),
         },
@@ -1002,14 +1002,14 @@ def _ficha(e: dict) -> str:
 
     bloque_antes = ""
     if pct:
-        bloque_antes = (f'<span class="antes">{referencia(e)} {e["precio_antes"]:.2f} EUR</span>'
+        bloque_antes = (f'<span class="antes">{referencia(e)} {e["precio_antes"]:.2f} €</span>'
                         f'<span class="pct">-{pct}%</span>')
 
     cuerpo = f"""  <p class="migas"><a href="{raiz}/">{html.escape(MARCA)}</a> ·
   <a href="{raiz}/ofertas.html">Ofertas</a></p>
   <h1>{html.escape(e["titulo"])}</h1>
   <figure><img src="{html.escape(imagen, quote=True)}" alt="{html.escape(e["titulo"], quote=True)}"></figure>
-  <div class="precios"><span class="ahora">{e["precio_ahora"]:.2f} EUR</span>{bloque_antes}</div>
+  <div class="precios"><span class="ahora">{e["precio_ahora"]:.2f} €</span>{bloque_antes}</div>
   <p class="fecha">Precio comprobado el {fecha}.</p>
   <a class="boton" href="{html.escape(enlace_afiliado(e["asin"]), quote=True)}"
      target="_blank" rel="nofollow sponsored noopener">Ver el precio en Amazon</a>
@@ -1041,7 +1041,7 @@ def _archivo(entradas: list) -> str:
     <img src="{html.escape(raiz + "/" + e.get("imagen", ""), quote=True)}" alt="" loading="lazy">
     <div>
       <a href="{html.escape(raiz + "/" + ruta_ficha(e), quote=True)}">{html.escape(e["titulo"])}</a>
-      <div class="p">{e["precio_ahora"]:.2f} EUR{f" · -{pct}%" if pct else ""}</div>
+      <div class="p">{e["precio_ahora"]:.2f} €{f" · -{pct}%" if pct else ""}</div>
     </div>
   </article>""")
     cuerpo = (f'  <h1>Todas las ofertas de {html.escape(MARCA)}</h1>\n'
@@ -1128,7 +1128,7 @@ def _guardar_estado(estado: dict) -> None:
 
 
 def _a_float(valor) -> float:
-    return float(str(valor).replace(",", ".").replace("EUR", "").strip() or 0)
+    return float(str(valor).replace(",", ".").replace("€", "").strip() or 0)
 
 
 def _leer_ofertas() -> list:
