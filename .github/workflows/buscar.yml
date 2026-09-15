@@ -1,0 +1,104 @@
+name: Buscar ofertas
+
+on:
+  schedule:
+    # Una vez al dia, por la manana. Buscar mas a menudo no aporta:
+    # las ofertas duran horas y la cola de publicacion va a una cada dos.
+    - cron: "0 7 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: buscar
+  cancel-in-progress: false
+
+jobs:
+  buscar:
+    runs-on: ubuntu-latest
+    env:
+      CREATORS_ID: ${{ secrets.CREATORS_ID }}
+      CREATORS_SECRET: ${{ secrets.CREATORS_SECRET }}
+      AMAZON_TAG: ${{ secrets.AMAZON_TAG }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Buscar candidatos
+        run: python buscar.py
+
+      - name: Ver si ha salido algo
+        id: comprobar
+        run: |
+          if [ -s candidatos.csv ]; then
+            echo "hay=si" >> "$GITHUB_OUTPUT"
+          else
+            echo "hay=no" >> "$GITHUB_OUTPUT"
+            echo "Sin candidatos hoy. No abro ninguna propuesta."
+          fi
+
+      # Las filas nuevas se anaden a ofertas.csv EN UNA RAMA APARTE.
+      # En main no toca nada, asi que el publicador no las ve hasta que
+      # Rodrigo aprueba la pull request.
+      - name: Preparar la propuesta
+        if: steps.comprobar.outputs.hay == 'si'
+        run: |
+          git config user.name  "bot-chollos"
+          git config user.email "bot-chollos@users.noreply.github.com"
+
+          RAMA="candidatos/$(date -u +%Y-%m-%d-%H%M)"
+          echo "RAMA=$RAMA" >> "$GITHUB_ENV"
+          git checkout -b "$RAMA"
+
+          # Si ofertas.csv no acabara en salto de linea, la primera fila
+          # nueva se pegaria a la ultima y romperiamos el archivo.
+          [ -n "$(tail -c 1 ofertas.csv)" ] && echo "" >> ofertas.csv
+
+          # Anadimos solo las filas, sin repetir la cabecera.
+          tail -n +2 candidatos.csv >> ofertas.csv
+          rm candidatos.csv
+
+          python - <<'PY'
+          import csv
+          filas = list(csv.DictReader(open("ofertas.csv", encoding="utf-8-sig")))
+          asins = [f["asin"] for f in filas]
+          assert len(asins) == len(set(asins)), "el CSV ha quedado con ASIN repetidos"
+          for f in filas:
+              assert len(f) == 8, f
+              assert float(f["precio_antes"]) > float(f["precio_ahora"]), f
+          print(f"ofertas.csv valido: {len(filas)} filas")
+          PY
+
+          git add ofertas.csv
+          git commit -m "Candidatos del $(date -u +%Y-%m-%d)"
+          git push origin "$RAMA"
+
+      - name: Abrir la pull request
+        if: steps.comprobar.outputs.hay == 'si'
+        run: |
+          gh pr create \
+            --base main \
+            --head "$RAMA" \
+            --title "Candidatos del $(date -u +%d/%m/%Y)" \
+            --body "$(cat <<'TEXTO'
+          El buscador ha encontrado estas ofertas con la API de Amazon.
+
+          **Nada de esto se publica hasta que fusiones esta propuesta.**
+
+          Mira la pestana *Files changed* para ver las filas nuevas. Si alguna
+          no te convence, editala o borrala ahi mismo antes de fusionar.
+
+          Repasa sobre todo los descuentos muy grandes: un -70% sobre un
+          precio de lista que nadie ha pagado nunca es la senal tipica de un
+          precio de referencia inflado. La columna `referencia` te dice si el
+          precio tachado es el PVP o el precio mediano de los ultimos 30 dias;
+          el mediano es el fiable.
+          TEXTO
+          )"
