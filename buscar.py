@@ -336,7 +336,10 @@ def recoger(volcar: bool = False) -> list:
         if volcar and items and not os.path.exists(RUTA_VOLCADO):
             with open(RUTA_VOLCADO, "w", encoding="utf-8") as f:
                 json.dump(items[0], f, ensure_ascii=False, indent=2)
-            print(f"Guardado un resultado crudo en {RUTA_VOLCADO}.")
+            print(f"Guardado un resultado crudo en {RUTA_VOLCADO}:")
+            # Tambien al log, que es donde lo podemos leer desde fuera.
+            print(json.dumps(items[0], ensure_ascii=False, indent=1)[:5000])
+            print("--- fin del volcado ---")
 
         nuevos = 0
         for item in items:
