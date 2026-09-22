@@ -5,7 +5,12 @@ on:
     # Una vez al dia, por la manana. Buscar mas a menudo no aporta:
     # las ofertas duran horas y la cola de publicacion va a una cada dos.
     - cron: "0 7 * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      volcar:
+        description: "Mostrar en el log una respuesta cruda de Amazon"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -32,7 +37,7 @@ jobs:
           python-version: "3.11"
 
       - name: Buscar candidatos
-        run: python buscar.py
+        run: python buscar.py ${{ inputs.volcar && '--volcar' || '' }}
 
       - name: Ver si ha salido algo
         id: comprobar
