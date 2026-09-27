@@ -1,0 +1,29 @@
+name: "Telegram: mensaje fijado"
+
+# Se lanza a mano, una sola vez, desde la pestana Actions. Publica el
+# mensaje de bienvenida del canal sin sonido, lo fija arriba y pone la
+# descripcion del canal. Si se lanza otra vez, fija un mensaje nuevo.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bienvenida:
+    runs-on: ubuntu-latest
+    env:
+      AMAZON_TAG: ${{ secrets.AMAZON_TAG }}
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      TELEGRAM_CANAL: ${{ secrets.TELEGRAM_CANAL }}
+      MARCA: ${{ vars.MARCA }}
+      PAGES_URL: ${{ vars.PAGES_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Enviar y fijar la bienvenida
+        run: python bot.py bienvenida
