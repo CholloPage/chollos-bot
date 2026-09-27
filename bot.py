@@ -4,7 +4,7 @@ Todo en un archivo a proposito, para que se pueda leer y editar entero
 desde la web de GitHub sin descargar nada.
 
 Uso:  python bot.py preparar   ->  elige oferta y genera la imagen
-      python bot.py publicar   ->  publica en Meta y actualiza la bio
+      python bot.py publicar   ->  publica en Meta y Telegram y actualiza la bio
 
 Con EN_SECO=1 no llama a ninguna API: genera imagen, textos y pagina.
 """
@@ -15,6 +15,7 @@ import json
 import os
 import random
 import shutil
+import subprocess
 import sys
 import textwrap
 import time
@@ -39,6 +40,18 @@ META_TOKEN = os.environ.get("META_TOKEN", "")          # token de larga duracion
 FB_PAGE_ID = os.environ.get("FB_PAGE_ID", "")
 IG_USER_ID = os.environ.get("IG_USER_ID", "")
 
+# --- Telegram (opcional: si falta alguno, el bot ni lo intenta) ---
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
+TELEGRAM_CANAL = os.environ.get("TELEGRAM_CANAL", "").strip()   # ej. @chollopage
+
+# --- Que se publica en esta ejecucion ---
+# Lo decide el workflow segun la hora: en las franjas punta sale en todas
+# partes, en el resto solo en Telegram. Asi Instagram y Facebook reciben
+# pocas publicaciones y buenas, y el canal va servido todo el dia.
+SOLO_TELEGRAM = os.environ.get("SOLO_TELEGRAM", "0") == "1"
+# Instagram y Facebook como Reel. Si el Reel falla, sale la foto de siempre.
+REELS = os.environ.get("REELS", "1") == "1"
+
 # --- GitHub Pages (link-in-bio y alojamiento de imagenes) ---
 # Ej: https://chollopage.github.io/chollos-bot
 PAGES_URL = os.environ.get("PAGES_URL", "").rstrip("/")
@@ -54,7 +67,8 @@ MARCA = os.environ.get("MARCA", "CholloPage")
 # Divulgacion obligatoria del vinculo de afiliado (Amazon la exige en cada
 # publicacion y en la pagina de destino). No la quites.
 DIVULGACION = (
-    "Enlace de afiliado: si compras, gano una pequena comision sin coste extra para ti."
+    "Enlace de afiliado: si compras, me llevo una pequeña comisión "
+    "y a ti no te cuesta nada más."
 )
 
 
@@ -63,28 +77,72 @@ DIVULGACION = (
 # Plantillas rotatorias: sin llamadas a IA, coste cero y predecible.
 # ======================================================================
 
+# La primera linea es lo unico que se ve sin pulsar "mas", asi que tiene
+# que decir algo. Nada de promesas que no podamos comprobar ("minimo
+# historico", "nunca visto"): solo lo que dicen los precios.
 APERTURAS = [
-    "Ojo a esto",
-    "Chollo del dia",
-    "Esto no dura",
-    "Se ha desplomado",
-    "Baja de precio ahora",
-    "Vaya precio",
+    "Ha bajado bastante",
+    "Rebajado",
+    "Si lo estabas mirando, hoy sale más barato",
+    "Chollo",
+    "Atento a este",
+    "Buena rebaja",
+    "Para apuntar",
+    "Hoy compensa",
 ]
 
 CIERRES = [
-    "El enlace esta en la bio.",
     "Enlace en la bio.",
-    "Te lo dejo en la bio.",
+    "El enlace lo tienes en la bio.",
+    "Lo encuentras en el enlace de la bio, arriba del todo.",
+    "Link en la bio.",
 ]
 
+# Hashtags concretos por categoria. Los genericos (#ofertas, #amazon)
+# tienen millones de publicaciones y una cuenta nueva no asoma nunca;
+# estos son mas estrechos y tienen publico que busca exactamente eso.
+# #chollosamazon y #chollosdeldia van siempre, son los de la casa.
 HASHTAGS = {
-    "Tecnologia": "#chollos #ofertas #tecnologia #gadgets #amazon",
-    "Hogar": "#chollos #ofertas #hogar #cocina #amazon",
-    "Moda": "#chollos #ofertas #moda #amazon",
-    "Deporte": "#chollos #ofertas #deporte #fitness #amazon",
+    "Tecnologia": "#chollosamazon #chollosdeldia #chollostecnologicos #gadgets #tecnologia #ofertasamazon",
+    "Hogar": "#chollosamazon #chollosdeldia #ofertashogar #hogar #decoracionhogar #limpiezahogar",
+    "Cocina": "#chollosamazon #chollosdeldia #cocina #utensiliosdecocina #ofertascocina #recetasfaciles",
+    "Deporte": "#chollosamazon #chollosdeldia #fitnessencasa #deporte #entrenamiento #ofertasdeporte",
+    "Moda": "#chollosamazon #chollosdeldia #ofertasmoda #modamujer #modahombre #lookdeldia",
+    "Belleza": "#chollosamazon #chollosdeldia #belleza #cuidadodelapiel #skincare #ofertasbelleza",
+    "Bebe": "#chollosamazon #chollosdeldia #bebe #maternidad #mamas #ofertasbebe",
+    "Mascotas": "#chollosamazon #chollosdeldia #mascotas #perros #gatos #ofertasmascotas",
 }
-HASHTAGS_POR_DEFECTO = "#chollos #ofertas #amazon #descuentos"
+HASHTAGS_POR_DEFECTO = "#chollosamazon #chollosdeldia #ofertasamazon #chollos #descuentos"
+
+
+def euros(importe: float) -> str:
+    """12345.6 -> '12.345,60 €', como se escribe en Espana."""
+    t = f"{importe:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{t} €"
+
+
+def _nombre_referencia(oferta: dict) -> str:
+    ref = referencia(oferta)
+    if ref.lower().startswith("precio mediano"):
+        return "precio mediano de los últimos 30 días"
+    return ref
+
+
+def linea_precio(oferta: dict) -> str:
+    pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
+    if not pct:
+        return euros(oferta["precio_ahora"])
+    return (f"{euros(oferta['precio_ahora'])} · antes {euros(oferta['precio_antes'])} "
+            f"({_nombre_referencia(oferta)}) · -{pct}%")
+
+
+def linea_telegram() -> str:
+    """Promocion cruzada: cada Reel empuja gente hacia el canal, que es
+    donde el enlace se puede pulsar."""
+    if not (TELEGRAM_TOKEN and TELEGRAM_CANAL):
+        return ""
+    canal = TELEGRAM_CANAL.lstrip("@")
+    return f"Más chollos cada día en Telegram: t.me/{canal}"
 
 
 def referencia(oferta: dict) -> str:
@@ -110,34 +168,46 @@ def enlace_afiliado(asin: str) -> str:
 
 
 def texto_facebook(oferta: dict) -> str:
-    pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
-    partes = [f"{random.choice(APERTURAS)}: {oferta['titulo']}"]
-    if pct:
-        partes.append(f"{oferta['precio_ahora']:.2f} € en vez de {oferta['precio_antes']:.2f} € (-{pct}% sobre {referencia(oferta)})")
-    else:
-        partes.append(f"{oferta['precio_ahora']:.2f} €")
+    partes = [f"{random.choice(APERTURAS)}: {oferta['titulo']}", linea_precio(oferta)]
     if oferta.get("gancho"):
         partes.append(oferta["gancho"] + ".")
     partes.append(enlace_afiliado(oferta["asin"]))
+    if linea_telegram():
+        partes.append(linea_telegram())
     partes.append(DIVULGACION)
+    partes.append(HASHTAGS.get(oferta.get("categoria"), HASHTAGS_POR_DEFECTO))
     return "\n\n".join(partes)
 
 
 def texto_instagram(oferta: dict) -> str:
     """En Instagram el enlace del pie no es clicable, asi que el copy
     empuja a la bio, donde vive el enlace real."""
-    pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
-    partes = [f"{random.choice(APERTURAS)}: {oferta['titulo']}"]
-    if pct:
-        partes.append(f"{oferta['precio_ahora']:.2f} € en vez de {oferta['precio_antes']:.2f} € (-{pct}% sobre {referencia(oferta)})")
-    else:
-        partes.append(f"{oferta['precio_ahora']:.2f} €")
+    partes = [f"{random.choice(APERTURAS)}: {oferta['titulo']}", linea_precio(oferta)]
     if oferta.get("gancho"):
         partes.append(oferta["gancho"] + ".")
     partes.append(random.choice(CIERRES))
+    if linea_telegram():
+        partes.append(linea_telegram())
     partes.append(DIVULGACION)
     partes.append(HASHTAGS.get(oferta.get("categoria"), HASHTAGS_POR_DEFECTO))
     return "\n\n".join(partes)
+
+
+def texto_telegram(oferta: dict) -> str:
+    """Telegram admite HTML sencillo. El enlace va en un boton debajo de
+    la foto, no en el texto, que queda mas limpio."""
+    pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
+    lineas = [f"<b>{html.escape(oferta['titulo'])}</b>", ""]
+    if pct:
+        lineas.append(f"<b>{euros(oferta['precio_ahora'])}</b>  "
+                      f"<s>{euros(oferta['precio_antes'])}</s>  -{pct}%")
+        lineas.append(html.escape(f"Referencia: {_nombre_referencia(oferta)}"))
+    else:
+        lineas.append(f"<b>{euros(oferta['precio_ahora'])}</b>")
+    if oferta.get("gancho"):
+        lineas.append(html.escape(oferta["gancho"]))
+    lineas += ["", f"<i>{html.escape(DIVULGACION)}</i>"]
+    return "\n".join(lineas)
 
 
 def texto_tiktok(oferta: dict) -> str:
@@ -488,10 +558,11 @@ def publicar_facebook(urls_imagen: list, texto: str) -> str:
 
 
 
-def _esperar_contenedor(contenedor: str) -> None:
-    """Instagram procesa cada imagen en segundo plano; hay que esperar."""
-    for _ in range(12):
-        time.sleep(5)
+def _esperar_contenedor(contenedor: str, intentos: int = 12, espera: int = 5) -> None:
+    """Instagram procesa cada imagen en segundo plano; hay que esperar.
+    Con video tarda bastante mas, de ahi los parametros."""
+    for _ in range(intentos):
+        time.sleep(espera)
         estado = requests.get(
             f"{_base()}/{contenedor}",
             params={"fields": "status_code", "access_token": META_TOKEN},
@@ -554,6 +625,167 @@ def publicar_instagram(urls_imagen: list, texto: str) -> str:
         timeout=TIEMPO_ESPERA,
     )
     return _comprobar(publicacion)["id"]
+
+
+# ----------------------------------------------------------------------
+# Reels
+#
+# El video se sube directamente a Meta ("subida resumible") en vez de
+# alojarlo en el repositorio: diez videos al dia inflarian el repo en
+# cientos de megas al mes, y asi no hay que esperar a que GitHub lo sirva.
+# ----------------------------------------------------------------------
+
+RUPLOAD = "https://rupload.facebook.com"
+DURACION_REEL = 9
+
+
+def generar_reel(ruta_imagen: str, destino: str) -> str:
+    """Video vertical de 9 segundos con un zoom lento sobre la historia.
+
+    Cumple lo que pide Instagram para un Reel: MP4, H.264, AAC, 9:16 y
+    1080x1920. El zoom es de solo un 5% para que no se corte nada, ni el
+    precio ni el aviso de publicidad de abajo. Lleva una pista de audio
+    en silencio porque algunos reproductores rechazan video sin audio.
+    """
+    fotogramas = DURACION_REEL * 30
+    filtro = (
+        "[0:v]scale=2160:3840,"
+        f"zoompan=z='1+0.05*on/{fotogramas - 1}':"
+        "x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+        f"d={fotogramas}:s=1080x1920:fps=30,format=yuv420p[v]"
+    )
+    orden = [
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+        "-loop", "1", "-framerate", "30", "-i", ruta_imagen,
+        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+        "-filter_complex", filtro,
+        "-map", "[v]", "-map", "1:a", "-t", str(DURACION_REEL),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+        "-profile:v", "high", "-level", "4.1", "-r", "30",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
+        "-shortest", "-movflags", "+faststart", destino,
+    ]
+    os.makedirs(os.path.dirname(destino) or ".", exist_ok=True)
+    r = subprocess.run(orden, capture_output=True, text=True, timeout=180)
+    if r.returncode != 0 or not os.path.exists(destino):
+        raise RuntimeError(f"ffmpeg fallo: {r.stderr[-300:]}")
+    return destino
+
+
+def _subir_resumible(url: str, ruta_video: str) -> None:
+    """Sube el video entero de una vez al servidor de subidas de Meta."""
+    tam = os.path.getsize(ruta_video)
+    with open(ruta_video, "rb") as f:
+        resp = requests.post(
+            url,
+            headers={
+                "Authorization": f"OAuth {META_TOKEN}",
+                "offset": "0",
+                "file_size": str(tam),
+            },
+            data=f,
+            timeout=300,
+        )
+    datos = _comprobar(resp)
+    if datos.get("success") is False:
+        raise RuntimeError(f"La subida del video no se completo: {datos}")
+
+
+def publicar_reel_instagram(ruta_video: str, texto: str) -> str:
+    """Reel de Instagram: contenedor, subida del video, espera a que Meta
+    lo procese (con video tarda minutos, no segundos) y publicacion."""
+    creacion = requests.post(
+        f"{_base()}/{IG_USER_ID}/media",
+        data={
+            "media_type": "REELS",
+            "upload_type": "resumable",
+            "caption": texto,
+            "share_to_feed": "true",
+            "access_token": META_TOKEN,
+        },
+        timeout=TIEMPO_ESPERA,
+    )
+    datos = _comprobar(creacion)
+    contenedor = datos["id"]
+    uri = datos.get("uri") or f"{RUPLOAD}/ig-api-upload/{META_VERSION}/{contenedor}"
+    _subir_resumible(uri, ruta_video)
+    _esperar_contenedor(contenedor, intentos=40, espera=10)
+    publicacion = requests.post(
+        f"{_base()}/{IG_USER_ID}/media_publish",
+        data={"creation_id": contenedor, "access_token": META_TOKEN},
+        timeout=TIEMPO_ESPERA,
+    )
+    return _comprobar(publicacion)["id"]
+
+
+def publicar_reel_facebook(ruta_video: str, texto: str) -> str:
+    """Reel en la Pagina de Facebook, en tres fases: empezar, subir, cerrar.
+    Los Reels si llegan a gente que no sigue la pagina; las publicaciones
+    con enlace externo apenas salen del circulo de seguidores."""
+    inicio = requests.post(
+        f"{_base()}/{FB_PAGE_ID}/video_reels",
+        data={"upload_phase": "start", "access_token": META_TOKEN},
+        timeout=TIEMPO_ESPERA,
+    )
+    datos = _comprobar(inicio)
+    video_id = datos["video_id"]
+    url = datos.get("upload_url") or f"{RUPLOAD}/video-upload/{META_VERSION}/{video_id}"
+    _subir_resumible(url, ruta_video)
+    fin = requests.post(
+        f"{_base()}/{FB_PAGE_ID}/video_reels",
+        data={
+            "upload_phase": "finish",
+            "video_id": video_id,
+            "video_state": "PUBLISHED",
+            "description": texto,
+            "access_token": META_TOKEN,
+        },
+        timeout=TIEMPO_ESPERA,
+    )
+    datos = _comprobar(fin)
+    if datos.get("success") is False:
+        raise RuntimeError(f"Facebook no acepto el Reel: {datos}")
+    return str(video_id)
+
+
+# ----------------------------------------------------------------------
+# Telegram
+# ----------------------------------------------------------------------
+
+def telegram_activo() -> bool:
+    return bool(TELEGRAM_TOKEN and TELEGRAM_CANAL)
+
+
+def publicar_telegram(ruta_foto: str, oferta: dict) -> str:
+    """Foto al canal con el texto y un boton que lleva a Amazon.
+
+    La foto se sube desde el disco, asi que no hay que esperar a que
+    GitHub la sirva. Los errores se limpian antes de imprimirlos: la URL
+    de la API lleva el token dentro y no queremos verlo en un log.
+    """
+    teclado = {"inline_keyboard": [[{
+        "text": "Ver oferta en Amazon",
+        "url": enlace_afiliado(oferta["asin"]),
+    }]]}
+    try:
+        with open(ruta_foto, "rb") as f:
+            resp = requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto",
+                data={
+                    "chat_id": TELEGRAM_CANAL,
+                    "caption": texto_telegram(oferta),
+                    "parse_mode": "HTML",
+                    "reply_markup": json.dumps(teclado),
+                },
+                files={"photo": f},
+                timeout=TIEMPO_ESPERA,
+            )
+        datos = resp.json()
+    except Exception as e:
+        raise RuntimeError(str(e).replace(TELEGRAM_TOKEN, "***")) from None
+    if not datos.get("ok"):
+        raise RuntimeError(f"Telegram: {datos.get('description', datos)}")
+    return str(datos["result"]["message_id"])
 
 
 def publicar_historia_instagram(url_imagen: str) -> str:
@@ -1185,6 +1417,14 @@ def _esperar_url(url: str, intentos: int = 20, espera: int = 6) -> None:
 
 
 def preparar() -> int:
+    if SOLO_TELEGRAM and not telegram_activo():
+        # Franja reservada a Telegram pero el canal aun no esta montado:
+        # no gastamos una oferta que no va a salir en ningun sitio.
+        print("Franja solo para Telegram y Telegram no esta configurado. No hago nada.")
+        if os.path.exists(RUTA_PENDIENTE):
+            os.remove(RUTA_PENDIENTE)
+        return 0
+
     estado = _leer_estado()
     oferta = _siguiente(_leer_ofertas(), estado)
     if not oferta:
@@ -1233,29 +1473,83 @@ def publicar() -> int:
         f.write(texto_tiktok(oferta))
     print("Paquete de TikTok listo en salida_tiktok/")
 
+    canales = []
+
+    # El Reel se genera siempre que haya historia: tambien sirve para
+    # TikTok, que va en el paquete descargable.
+    ruta_reel = None
+    if REELS and nombre_historia:
+        try:
+            ruta_reel = generar_reel(os.path.join(DIR_IMG, nombre_historia),
+                                     os.path.join(DIR_TIKTOK, "reel.mp4"))
+            print(f"Reel generado: {os.path.getsize(ruta_reel) // 1024} KB")
+        except Exception as e:
+            print(f"AVISO no se pudo generar el Reel, tiro de foto: {e}")
+            ruta_reel = None
+
     if EN_SECO:
-        print("--- MODO EN SECO, no se llama a Meta ---")
+        print("--- MODO EN SECO, no se llama a ninguna API ---")
+        print("SOLO TELEGRAM" if SOLO_TELEGRAM else "TODAS LAS REDES")
         print("FACEBOOK:\n" + texto_facebook(oferta))
         print("\nINSTAGRAM:\n" + texto_instagram(oferta))
+        print("\nTELEGRAM:\n" + texto_telegram(oferta))
     else:
-        urls = [f"{_base_imagenes()}/{n}" for n in nombres]
-        for url in urls:
-            _esperar_url(url)
-        try:
-            print(f"Facebook publicado: {publicar_facebook(urls, texto_facebook(oferta))}")
-        except Exception as e:  # si falla uno, el otro puede seguir
-            print(f"AVISO Facebook fallo: {e}")
-        try:
-            print(f"Instagram publicado: {publicar_instagram(urls, texto_instagram(oferta))}")
-        except Exception as e:
-            print(f"AVISO Instagram fallo: {e}")
-        if nombre_historia:
+        # Telegram primero: no depende de que GitHub sirva la imagen.
+        if telegram_activo():
             try:
-                url_h = f"{_base_imagenes()}/{nombre_historia}"
-                _esperar_url(url_h)
-                print(f"Historia publicada: {publicar_historia_instagram(url_h)}")
+                mid = publicar_telegram(os.path.join(DIR_IMG, nombres[0]), oferta)
+                print(f"Telegram publicado: {mid}")
+                canales.append("telegram")
             except Exception as e:
-                print(f"AVISO la historia fallo: {e}")
+                print(f"AVISO Telegram fallo: {e}")
+        elif SOLO_TELEGRAM:
+            print("AVISO franja de Telegram sin Telegram configurado.")
+
+        if not SOLO_TELEGRAM:
+            urls = [f"{_base_imagenes()}/{n}" for n in nombres]
+            for url in urls:
+                _esperar_url(url)
+
+            # Facebook: Reel si se puede; si no, la foto con enlace.
+            hecho = False
+            if ruta_reel:
+                try:
+                    print(f"Facebook Reel publicado: {publicar_reel_facebook(ruta_reel, texto_facebook(oferta))}")
+                    canales.append("facebook-reel")
+                    hecho = True
+                except Exception as e:
+                    print(f"AVISO el Reel de Facebook fallo, publico la foto: {e}")
+            if not hecho:
+                try:
+                    print(f"Facebook publicado: {publicar_facebook(urls, texto_facebook(oferta))}")
+                    canales.append("facebook")
+                except Exception as e:  # si falla uno, los demas siguen
+                    print(f"AVISO Facebook fallo: {e}")
+
+            # Instagram: igual.
+            hecho = False
+            if ruta_reel:
+                try:
+                    print(f"Instagram Reel publicado: {publicar_reel_instagram(ruta_reel, texto_instagram(oferta))}")
+                    canales.append("instagram-reel")
+                    hecho = True
+                except Exception as e:
+                    print(f"AVISO el Reel de Instagram fallo, publico la foto: {e}")
+            if not hecho:
+                try:
+                    print(f"Instagram publicado: {publicar_instagram(urls, texto_instagram(oferta))}")
+                    canales.append("instagram")
+                except Exception as e:
+                    print(f"AVISO Instagram fallo: {e}")
+
+            if nombre_historia:
+                try:
+                    url_h = f"{_base_imagenes()}/{nombre_historia}"
+                    _esperar_url(url_h)
+                    print(f"Historia publicada: {publicar_historia_instagram(url_h)}")
+                    canales.append("historia")
+                except Exception as e:
+                    print(f"AVISO la historia fallo: {e}")
 
     estado = _leer_estado()
     estado.setdefault("publicadas", []).append({
@@ -1267,6 +1561,7 @@ def publicar() -> int:
         "historia": f"img/{nombre_historia}" if nombre_historia else "",
         "referencia": referencia(oferta),
         "texto_tiktok": texto_tiktok(oferta),
+        "canales": canales,
         "fecha": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     })
     _guardar_estado(estado)
