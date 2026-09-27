@@ -3,14 +3,10 @@ name: Publicar chollo
 on:
   schedule:
     # Horas en UTC. Diez publicaciones al dia y ninguna de madrugada.
-    #
-    # Franjas punta: Instagram, Facebook y Telegram. En horario de verano
-    # de Espana son las 8, 12, 19 y 21; en invierno, una hora menos.
-    - cron: "0 6,10,17,19 * * *"
-    # Resto del dia: solo Telegram. En verano, las 7, 9, 11, 13, 17 y 20.
-    # Si Telegram aun no esta configurado, estas no hacen nada y no gastan
-    # oferta.
-    - cron: "0 5,7,9,11,15,18 * * *"
+    # Todas van a Instagram (Reel + historia), Facebook (Reel), Telegram y
+    # la pagina de la bio. En horario de verano de Espana son las 7, 8, 9,
+    # 11, 12, 13, 17, 19, 20 y 21; en invierno, una hora menos.
+    - cron: "0 5,6,7,9,10,11,15,17,18,19 * * *"
   workflow_dispatch:   # boton para lanzarlo a mano desde la pestana Actions
     inputs:
       solo_telegram:
@@ -35,9 +31,9 @@ jobs:
       IG_USER_ID: ${{ secrets.IG_USER_ID }}
       TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
       TELEGRAM_CANAL: ${{ secrets.TELEGRAM_CANAL }}
-      # Que franja ha disparado esta ejecucion. Tiene que coincidir letra
-      # a letra con la segunda linea de cron de arriba.
-      SOLO_TELEGRAM: ${{ ((github.event_name == 'schedule' && github.event.schedule == '0 5,7,9,11,15,18 * * *') || (github.event_name == 'workflow_dispatch' && inputs.solo_telegram)) && '1' || '0' }}
+      # Solo Telegram unicamente si se lanza a mano con esa casilla marcada.
+      # Las ejecuciones programadas publican en todas partes.
+      SOLO_TELEGRAM: ${{ (github.event_name == 'workflow_dispatch' && inputs.solo_telegram) && '1' || '0' }}
       MARCA: ${{ vars.MARCA }}
       PAGES_URL: ${{ vars.PAGES_URL }}
       # Servimos la imagen desde raw.githubusercontent: esta disponible
