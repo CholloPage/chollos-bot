@@ -14,6 +14,7 @@ import io
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -136,13 +137,23 @@ def linea_precio(oferta: dict) -> str:
             f"({_nombre_referencia(oferta)}) · -{pct}%")
 
 
+def usuario_telegram() -> str:
+    """Nombre publico del canal (sin @) para montar enlaces t.me. Si el
+    canal se ha configurado por su id numerico (-100...), no hay enlace
+    publico que mostrar y devolvemos cadena vacia."""
+    canal = TELEGRAM_CANAL.strip().lstrip("@")
+    for prefijo in ("https://t.me/", "http://t.me/", "t.me/"):
+        if canal.startswith(prefijo):
+            canal = canal[len(prefijo):]
+    return canal if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{3,31}", canal) else ""
+
+
 def linea_telegram() -> str:
     """Promocion cruzada: cada Reel empuja gente hacia el canal, que es
     donde el enlace se puede pulsar."""
-    if not (TELEGRAM_TOKEN and TELEGRAM_CANAL):
+    if not (TELEGRAM_TOKEN and usuario_telegram()):
         return ""
-    canal = TELEGRAM_CANAL.lstrip("@")
-    return f"Más chollos cada día en Telegram: t.me/{canal}"
+    return f"Más chollos cada día en Telegram: t.me/{usuario_telegram()}"
 
 
 def referencia(oferta: dict) -> str:
@@ -823,7 +834,7 @@ PLANTILLA = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{marca}</title>
-<meta name="description" content="Los ultimos chollos de Amazon, actualizados cada dos horas.">
+<meta name="description" content="Los ultimos chollos de Amazon, nuevos varias veces al dia.">
 <style>
   :root {{
     --fondo: #0f1218; --tarjeta: #171b24; --borde: #262c38;
@@ -867,6 +878,12 @@ PLANTILLA = """<!doctype html>
   .cuando {{ color: var(--apagado); font-size: 12px; margin-top: 8px; }}
   footer {{ text-align: center; color: var(--apagado); font-size: 12px; margin-top: 28px; }}
   .vacio {{ text-align: center; color: var(--apagado); padding: 40px 0; }}
+  a.telegram {{
+    display: block; text-align: center; text-decoration: none;
+    background: #229ed9; color: #fff; font-weight: 700; font-size: 15px;
+    border-radius: 999px; padding: 12px 16px; margin: 0 0 22px;
+  }}
+  a.telegram span {{ display: block; font-weight: 400; font-size: 12.5px; opacity: .9; }}
   @media (prefers-color-scheme: light) {{
     :root {{
       --fondo: #f6f7fa; --tarjeta: #ffffff; --borde: #e2e6ee;
@@ -880,11 +897,11 @@ PLANTILLA = """<!doctype html>
 <div class="envoltorio">
   <header>
     <h1>{marca}</h1>
-    <p class="lema">Chollos de Amazon, actualizados cada dos horas</p>
+    <p class="lema">Chollos de Amazon, nuevos varias veces al dia</p>
   </header>
   <p class="aviso">Como afiliado de Amazon, gano una comision por las compras
   que cumplan los requisitos. No te cuesta nada de mas.</p>
-  {tarjetas}
+{telegram}  {tarjetas}
   <footer>Ultima actualizacion: {actualizado} (hora peninsular)</footer>
 </div>
 </body>
@@ -934,8 +951,17 @@ def regenerar(ruta_estado: str = "estado.json", destino: str = "docs/index.html"
     if not tarjetas:
         tarjetas = ['  <p class="vacio">Todavia no hay ofertas publicadas.</p>']
 
+    boton_telegram = ""
+    if usuario_telegram():
+        canal = html.escape(usuario_telegram(), quote=True)
+        boton_telegram = (
+            f'  <a class="telegram" href="https://t.me/{canal}" target="_blank" rel="noopener">'
+            f'Avisos al momento en Telegram<span>Cada chollo nuevo te llega al movil</span></a>\n'
+        )
+
     pagina = PLANTILLA.format(
         marca=html.escape(MARCA),
+        telegram=boton_telegram,
         tarjetas="\n".join(tarjetas),
         actualizado=datetime.now(ZoneInfo("Europe/Madrid")).strftime("%d/%m/%Y a las %H:%M"),
     )
