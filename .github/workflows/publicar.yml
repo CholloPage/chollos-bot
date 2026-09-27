@@ -2,10 +2,21 @@ name: Publicar chollo
 
 on:
   schedule:
-    # Cada 1 horas en punto (UTC). GitHub puede retrasarlo unos minutos
-    # cuando hay cola; es normal y no rompe nada.
-    - cron: "0 */1 * * *"
-  workflow_dispatch: {}   # boton para lanzarlo a mano desde la pestana Actions
+    # Horas en UTC. Diez publicaciones al dia y ninguna de madrugada.
+    #
+    # Franjas punta: Instagram, Facebook y Telegram. En horario de verano
+    # de Espana son las 8, 12, 19 y 21; en invierno, una hora menos.
+    - cron: "0 6,10,17,19 * * *"
+    # Resto del dia: solo Telegram. En verano, las 7, 9, 11, 13, 17 y 20.
+    # Si Telegram aun no esta configurado, estas no hacen nada y no gastan
+    # oferta.
+    - cron: "0 5,7,9,11,15,18 * * *"
+  workflow_dispatch:   # boton para lanzarlo a mano desde la pestana Actions
+    inputs:
+      solo_telegram:
+        description: "Publicar solo en Telegram"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -22,6 +33,11 @@ jobs:
       META_TOKEN: ${{ secrets.META_TOKEN }}
       FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
       IG_USER_ID: ${{ secrets.IG_USER_ID }}
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      TELEGRAM_CANAL: ${{ secrets.TELEGRAM_CANAL }}
+      # Que franja ha disparado esta ejecucion. Tiene que coincidir letra
+      # a letra con la segunda linea de cron de arriba.
+      SOLO_TELEGRAM: ${{ ((github.event_name == 'schedule' && github.event.schedule == '0 5,7,9,11,15,18 * * *') || (github.event_name == 'workflow_dispatch' && inputs.solo_telegram)) && '1' || '0' }}
       MARCA: ${{ vars.MARCA }}
       PAGES_URL: ${{ vars.PAGES_URL }}
       # Servimos la imagen desde raw.githubusercontent: esta disponible
@@ -38,12 +54,16 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      - name: Instalar ffmpeg (para los Reels)
+        run: which ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+
       # El cron salta en punto, pero publicar siempre a las 10:00 clavadas
-      # canta a bot. Esperamos un rato al azar para repartir las horas.
+      # canta a bot. Esperamos un rato al azar, como mucho 20 minutos, para
+      # no invadir la franja siguiente.
       - name: Esperar un rato al azar
         if: github.event_name == 'schedule'
         run: |
-          ESPERA=$((RANDOM % 3300))
+          ESPERA=$((RANDOM % 1200))
           echo "Esperando $ESPERA segundos para no publicar siempre en punto."
           sleep $ESPERA
 
@@ -77,7 +97,7 @@ jobs:
           done
           git push
 
-      - name: Publicar en Facebook e Instagram
+      - name: Publicar en redes
         if: steps.comprobar.outputs.hay == 'si'
         run: python bot.py publicar
 
