@@ -137,6 +137,36 @@ def linea_precio(oferta: dict) -> str:
             f"({_nombre_referencia(oferta)}) · -{pct}%")
 
 
+def hora_madrid(iso: str, formato: str = "%d/%m/%Y %H:%M") -> str:
+    """Las fechas se guardan en UTC; al mostrarlas, siempre en hora de Madrid."""
+    if not iso:
+        return ""
+    try:
+        d = datetime.fromisoformat(iso)
+    except ValueError:
+        return iso[:16].replace("T", " ")
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return d.astimezone(ZoneInfo("Europe/Madrid")).strftime(formato)
+
+
+def enlace_compartir_canal() -> str:
+    """Enlace de Telegram para reenviar el canal a un contacto."""
+    from urllib.parse import quote
+    canal = f"https://t.me/{usuario_telegram()}"
+    texto = "Canal de chollos de Amazon con el precio y el descuento de verdad:"
+    return f"https://t.me/share/url?url={quote(canal, safe='')}&text={quote(texto, safe='')}"
+
+
+def cta_telegram_html() -> str:
+    """Boton al canal para las paginas web. Vacio si no hay canal publico."""
+    if not usuario_telegram():
+        return ""
+    canal = html.escape(usuario_telegram(), quote=True)
+    return (f'  <a class="telegram" href="https://t.me/{canal}" target="_blank" rel="noopener">'
+            f'Avisos al momento en Telegram<span>Cada chollo nuevo te llega al movil, gratis</span></a>\n')
+
+
 def usuario_telegram() -> str:
     """Nombre publico del canal (sin @) para montar enlaces t.me. Si el
     canal se ha configurado por su id numerico (-100...), no hay enlace
@@ -778,6 +808,11 @@ def publicar_telegram(ruta_foto: str, oferta: dict) -> str:
         "text": "Ver oferta en Amazon",
         "url": enlace_afiliado(oferta["asin"]),
     }]]}
+    if usuario_telegram():
+        teclado["inline_keyboard"].append([{
+            "text": "Compartir el canal con alguien",
+            "url": enlace_compartir_canal(),
+        }])
     try:
         with open(ruta_foto, "rb") as f:
             resp = requests.post(
@@ -835,6 +870,13 @@ PLANTILLA = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{marca}</title>
 <meta name="description" content="Los ultimos chollos de Amazon, nuevos varias veces al dia.">
+<link rel="canonical" href="{url_pagina}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{marca}: chollos de Amazon cada dia">
+<meta property="og:description" content="Ofertas de Amazon con el precio de referencia real y el descuento calculado. Nuevas varias veces al dia.">
+<meta property="og:url" content="{url_pagina}">
+<meta property="og:image" content="{og_imagen}">
+<meta name="twitter:card" content="summary_large_image">
 <style>
   :root {{
     --fondo: #0f1218; --tarjeta: #171b24; --borde: #262c38;
@@ -884,6 +926,11 @@ PLANTILLA = """<!doctype html>
     border-radius: 999px; padding: 12px 16px; margin: 0 0 22px;
   }}
   a.telegram span {{ display: block; font-weight: 400; font-size: 12.5px; opacity: .9; }}
+  button.compartir {{
+    display: block; width: 100%; margin: 18px 0 0; padding: 12px 16px;
+    background: transparent; color: var(--texto); border: 1px solid var(--borde);
+    border-radius: 999px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  }}
   @media (prefers-color-scheme: light) {{
     :root {{
       --fondo: #f6f7fa; --tarjeta: #ffffff; --borde: #e2e6ee;
@@ -902,8 +949,21 @@ PLANTILLA = """<!doctype html>
   <p class="aviso">Como afiliado de Amazon, gano una comision por las compras
   que cumplan los requisitos. No te cuesta nada de mas.</p>
 {telegram}  {tarjetas}
+  <button class="compartir" type="button" id="compartir">Pasale esta pagina a alguien</button>
   <footer>Ultima actualizacion: {actualizado} (hora peninsular)</footer>
 </div>
+<script>
+  (function () {{
+    var b = document.getElementById("compartir");
+    if (!b) return;
+    b.addEventListener("click", function () {{
+      var url = location.href.split("#")[0].split("?")[0];
+      var datos = {{ title: document.title, text: "Chollos de Amazon con el descuento de verdad:", url: url }};
+      if (navigator.share) {{ navigator.share(datos).catch(function () {{}}); return; }}
+      window.open("https://wa.me/?text=" + encodeURIComponent(datos.text + " " + url), "_blank", "noopener");
+    }});
+  }})();
+</script>
 </body>
 </html>
 """
@@ -919,7 +979,7 @@ TARJETA = """  <a class="oferta" href="{enlace}" target="_blank" rel="nofollow s
         </div>
       </div>
     </div>
-    <div class="cuando">Publicado el {cuando}</div>
+    <div class="cuando">Publicado el {cuando} (hora peninsular)</div>
   </a>
 """
 
@@ -944,24 +1004,22 @@ def regenerar(ruta_estado: str = "estado.json", destino: str = "docs/index.html"
                 titulo=html.escape(e["titulo"]),
                 ahora=f'{e["precio_ahora"]:.2f}',
                 bloque_antes=bloque_antes,
-                cuando=e.get("fecha", "")[:16].replace("T", " "),
+                cuando=hora_madrid(e.get("fecha", "")),
             )
         )
 
     if not tarjetas:
         tarjetas = ['  <p class="vacio">Todavia no hay ofertas publicadas.</p>']
 
-    boton_telegram = ""
-    if usuario_telegram():
-        canal = html.escape(usuario_telegram(), quote=True)
-        boton_telegram = (
-            f'  <a class="telegram" href="https://t.me/{canal}" target="_blank" rel="noopener">'
-            f'Avisos al momento en Telegram<span>Cada chollo nuevo te llega al movil</span></a>\n'
-        )
+    boton_telegram = cta_telegram_html()
+    raiz = PAGES_URL.rstrip("/") if PAGES_URL else ""
+    og_imagen = f'{raiz}/{entradas[0].get("imagen", "")}' if (raiz and entradas) else ""
 
     pagina = PLANTILLA.format(
         marca=html.escape(MARCA),
         telegram=boton_telegram,
+        url_pagina=html.escape(f"{raiz}/" if raiz else "", quote=True),
+        og_imagen=html.escape(og_imagen, quote=True),
         tarjetas="\n".join(tarjetas),
         actualizado=datetime.now(ZoneInfo("Europe/Madrid")).strftime("%d/%m/%Y a las %H:%M"),
     )
@@ -1177,6 +1235,12 @@ CABECERA_SEO = """<!doctype html>
   article.item img {{ width: 74px; height: 74px; object-fit: cover; border-radius: 9px; }}
   article.item a {{ text-decoration: none; color: var(--texto); font-weight: 600; font-size: 15.5px; }}
   article.item .p {{ color: var(--acento); font-weight: 700; font-size: 15px; }}
+  a.telegram {{
+    display: block; text-align: center; text-decoration: none;
+    background: #229ed9; color: #fff; font-weight: 700; font-size: 15px;
+    border-radius: 14px; padding: 12px 16px; margin: 0 0 22px;
+  }}
+  a.telegram span {{ display: block; font-weight: 400; font-size: 12.5px; opacity: .9; }}
   footer {{ margin-top: 40px; color: var(--apagado); font-size: 13px; }}
   @media (prefers-color-scheme: light) {{
     :root {{
@@ -1229,7 +1293,7 @@ def _ficha(e: dict) -> str:
     raiz = _raiz()
     canonica = f'{raiz}/{ruta_ficha(e)}'
     imagen = f'{raiz}/{e.get("imagen", "")}'
-    fecha = e.get("fecha", "")[:10]
+    fecha = hora_madrid(e.get("fecha", ""), "%d/%m/%Y")
 
     titulo_seo = f'{e["titulo"]} por {e["precio_ahora"]:.2f} €'
     if pct:
@@ -1250,7 +1314,7 @@ def _ficha(e: dict) -> str:
         "offers": {
             "@type": "Offer",
             "price": f'{e["precio_ahora"]:.2f}',
-            "priceCurrency": "€",
+            "priceCurrency": "EUR",
             "availability": "https://schema.org/InStock",
             "url": enlace_afiliado(e["asin"]),
         },
@@ -1273,7 +1337,7 @@ def _ficha(e: dict) -> str:
      target="_blank" rel="nofollow sponsored noopener">Ver el precio en Amazon</a>
   <div class="aviso">Enlace de afiliado. Si compras a traves de el, gano una pequena
   comision y a ti no te cuesta nada de mas.</div>
-  <h2>Antes de comprar</h2>
+{cta_telegram_html()}  <h2>Antes de comprar</h2>
   <ul class="lista">
     <li>El precio tachado es la referencia que muestra la ficha de Amazon
     ({html.escape(referencia(e))}), no necesariamente lo que costaba la semana pasada.</li>
@@ -1304,7 +1368,8 @@ def _archivo(entradas: list) -> str:
   </article>""")
     cuerpo = (f'  <h1>Todas las ofertas de {html.escape(MARCA)}</h1>\n'
               f'  <p class="fecha">Chollos de Amazon publicados hasta hoy, con el precio '
-              f'que tenian el dia de la publicacion.</p>\n' + "\n".join(filas) + "\n")
+              f'que tenian el dia de la publicacion.</p>\n' + cta_telegram_html()
+              + "\n".join(filas) + "\n")
     return (CABECERA_SEO.format(
                 titulo_seo=html.escape(f"Todas las ofertas | {MARCA}", quote=True),
                 descripcion=html.escape(
@@ -1586,6 +1651,7 @@ def publicar() -> int:
         "imagen": f"img/{nombres[0]}",
         "historia": f"img/{nombre_historia}" if nombre_historia else "",
         "referencia": referencia(oferta),
+        "categoria": oferta.get("categoria", ""),
         "texto_tiktok": texto_tiktok(oferta),
         "canales": canales,
         "fecha": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -1600,6 +1666,69 @@ def publicar() -> int:
     return 0
 
 
+BIENVENIDA = """<b>Bienvenido a {marca}</b>
+
+Aquí salen unas diez ofertas de Amazon al día, de 7 de la mañana a 9 de la noche (hora peninsular).
+
+En cada una ves el precio de ahora, el precio de referencia que muestra Amazon (el PVP o el precio mediano) y el descuento calculado sobre ese número. Si el PVP tachado es de fantasía, la oferta no entra.
+
+Consejo: silencia el canal si los avisos te molestan y échale un ojo cuando te venga bien. Y si conoces a alguien que compra mucho en Amazon, pásale el canal.
+
+<i>{divulgacion}</i>"""
+
+DESCRIPCION_CANAL = ("Chollos de Amazon cada día, con el descuento calculado sobre el precio "
+                     "de referencia real. Contiene enlaces de afiliado.")
+
+
+def _telegram(metodo: str, datos: dict) -> dict:
+    try:
+        resp = requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/{metodo}",
+                             data=datos, timeout=TIEMPO_ESPERA)
+        respuesta = resp.json()
+    except Exception as e:
+        raise RuntimeError(str(e).replace(TELEGRAM_TOKEN, "***")) from None
+    if not respuesta.get("ok"):
+        raise RuntimeError(f"Telegram {metodo}: {respuesta.get('description', respuesta)}")
+    return respuesta.get("result", {})
+
+
+def bienvenida_telegram() -> int:
+    """Mensaje de bienvenida fijado arriba del canal. Se lanza a mano una
+    sola vez desde Actions (workflow 'Telegram: mensaje fijado')."""
+    if not telegram_activo():
+        print("Telegram no esta configurado.")
+        return 1
+    botones = [[{"text": "Ver todos los chollos", "url": f"{PAGES_URL}/" if PAGES_URL
+                 else "https://chollopage.github.io/chollos-bot/"}]]
+    if usuario_telegram():
+        botones.append([{"text": "Compartir el canal con alguien", "url": enlace_compartir_canal()}])
+    msg = _telegram("sendMessage", {
+        "chat_id": TELEGRAM_CANAL,
+        "text": BIENVENIDA.format(marca=html.escape(MARCA), divulgacion=html.escape(DIVULGACION)),
+        "parse_mode": "HTML",
+        "disable_notification": "true",
+        "disable_web_page_preview": "true",
+        "reply_markup": json.dumps({"inline_keyboard": botones}),
+    })
+    print(f"Bienvenida enviada: {msg.get('message_id')}")
+    try:
+        _telegram("pinChatMessage", {"chat_id": TELEGRAM_CANAL,
+                                     "message_id": msg["message_id"],
+                                     "disable_notification": "true"})
+        print("Bienvenida fijada arriba del canal.")
+    except Exception as e:
+        print(f"AVISO no se pudo fijar (dale al bot permiso para fijar mensajes): {e}")
+    try:
+        _telegram("setChatDescription", {"chat_id": TELEGRAM_CANAL,
+                                         "description": DESCRIPCION_CANAL})
+        print("Descripcion del canal actualizada.")
+    except Exception as e:
+        print(f"AVISO no se pudo cambiar la descripcion: {e}")
+    return 0
+
+
 if __name__ == "__main__":
     accion = sys.argv[1] if len(sys.argv) > 1 else "preparar"
+    if accion == "bienvenida":
+        sys.exit(bienvenida_telegram())
     sys.exit(preparar() if accion == "preparar" else publicar())
