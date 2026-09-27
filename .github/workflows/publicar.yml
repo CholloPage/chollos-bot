@@ -2,11 +2,27 @@ name: Publicar chollo
 
 on:
   schedule:
-    # Horas en UTC. Diez publicaciones al dia y ninguna de madrugada.
-    # Todas van a Instagram (Reel + historia), Facebook (Reel), Telegram y
-    # la pagina de la bio. En horario de verano de Espana son las 7, 8, 9,
-    # 11, 12, 13, 17, 19, 20 y 21; en invierno, una hora menos.
-    - cron: "0 5,6,7,9,10,11,15,17,18,19 * * *"
+    # Las publicaciones van por HORA DE MADRID: 7, 8, 9, 11, 12, 13, 17,
+    # 19, 20 y 21, todo el ano. GitHub solo entiende UTC y Espana cambia
+    # de hora dos veces al ano, asi que aqui salta a todas las horas UTC
+    # que pueden caer en esas franjas (verano UTC+2 e invierno UTC+1) y el
+    # primer trabajo, "hora", deja pasar solo la que toca en Madrid.
+    # Cada hora va en su propia linea para saber cual ha disparado aunque
+    # GitHub se retrase: asi un retraso nunca mueve la franja.
+    - cron: "0 5 * * *"
+    - cron: "0 6 * * *"
+    - cron: "0 7 * * *"
+    - cron: "0 8 * * *"
+    - cron: "0 9 * * *"
+    - cron: "0 10 * * *"
+    - cron: "0 11 * * *"
+    - cron: "0 12 * * *"
+    - cron: "0 15 * * *"
+    - cron: "0 16 * * *"
+    - cron: "0 17 * * *"
+    - cron: "0 18 * * *"
+    - cron: "0 19 * * *"
+    - cron: "0 20 * * *"
   workflow_dispatch:   # boton para lanzarlo a mano desde la pestana Actions
     inputs:
       solo_telegram:
@@ -17,13 +33,39 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: publicar
-  cancel-in-progress: false
-
 jobs:
-  publicar:
+  hora:
     runs-on: ubuntu-latest
+    outputs:
+      toca: ${{ steps.madrid.outputs.toca }}
+    steps:
+      - id: madrid
+        env:
+          EVENTO: ${{ github.event_name }}
+          CRON: ${{ github.event.schedule }}
+        run: |
+          FRANJAS=" 7 8 9 11 12 13 17 19 20 21 "
+          if [ "$EVENTO" != "schedule" ]; then
+            echo "Lanzado a mano: se publica."
+            echo "toca=si" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # Hora UTC que pedia este cron (no la de arranque, por si hubo retraso)
+          H_UTC=$(echo "$CRON" | awk '{print $2}')
+          H_MADRID=$(TZ=Europe/Madrid date -d "$(date -u +%Y-%m-%d) ${H_UTC}:00 UTC" +%-H)
+          echo "Cron de las ${H_UTC}:00 UTC = las ${H_MADRID}:00 en Madrid."
+          case "$FRANJAS" in
+            *" $H_MADRID "*) echo "Franja de publicacion."; echo "toca=si" >> "$GITHUB_OUTPUT" ;;
+            *) echo "No es franja en Madrid. No se publica."; echo "toca=no" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  publicar:
+    needs: hora
+    if: needs.hora.outputs.toca == 'si'
+    runs-on: ubuntu-latest
+    # Nunca dos publicaciones a la vez (se pisarian el estado.json).
+    concurrency:
+      group: publicar
+      cancel-in-progress: false
     env:
       AMAZON_TAG: ${{ secrets.AMAZON_TAG }}
       META_TOKEN: ${{ secrets.META_TOKEN }}
@@ -54,12 +96,12 @@ jobs:
         run: which ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
 
       # El cron salta en punto, pero publicar siempre a las 10:00 clavadas
-      # canta a bot. Esperamos un rato al azar, como mucho 20 minutos, para
+      # canta a bot. Esperamos un rato al azar, como mucho 15 minutos, para
       # no invadir la franja siguiente.
       - name: Esperar un rato al azar
         if: github.event_name == 'schedule'
         run: |
-          ESPERA=$((RANDOM % 1200))
+          ESPERA=$((RANDOM % 900))
           echo "Esperando $ESPERA segundos para no publicar siempre en punto."
           sleep $ESPERA
 
