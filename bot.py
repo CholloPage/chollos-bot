@@ -1287,7 +1287,94 @@ def ruta_ficha(e: dict) -> str:
     return f'oferta/{e["asin"]}-{_slug(e["titulo"])}.html'
 
 
-def _ficha(e: dict) -> str:
+# Categorias de la web. El CSV tiene nombres sueltos ("Informatica",
+# "Cuidado personal"...); aqui se agrupan en ocho paginas.
+CATEGORIAS_WEB = {
+    "tecnologia": ("Tecnología", "Móviles, auriculares, cargadores, informática y demás "
+                   "cacharros con el precio rebajado."),
+    "hogar": ("Hogar", "Aspiradoras, textiles, muebles, bricolaje y cosas de casa que han "
+              "bajado de precio."),
+    "cocina": ("Cocina", "Sartenes, freidoras de aire, menaje y pequeño electrodoméstico "
+               "de cocina en oferta."),
+    "deporte": ("Deporte", "Material para entrenar en casa o fuera con descuento."),
+    "moda": ("Moda y viaje", "Ropa, maletas y complementos rebajados."),
+    "belleza": ("Belleza y cuidado personal", "Afeitado, depilación, higiene bucal y "
+                "cuidado personal con el precio rebajado."),
+    "bebe": ("Bebé", "Pañales, higiene y cosas para los peques en oferta."),
+    "mascotas": ("Mascotas", "Comida, arena y accesorios para perros y gatos con descuento."),
+}
+_ALIAS_CATEGORIA = {
+    "tecnologia": "tecnologia", "informatica": "tecnologia", "informatcia": "tecnologia",
+    "moviles": "tecnologia", "audio": "tecnologia", "hi-fi": "tecnologia", "tv": "tecnologia",
+    "fotografia": "tecnologia", "videocamara": "tecnologia", "kindle": "tecnologia",
+    "juegos": "tecnologia", "videojuegos": "tecnologia",
+    "hogar": "hogar", "muebles": "hogar", "bricolaje": "hogar", "bricolage": "hogar",
+    "grandes electrodomesticos": "hogar", "papeleria": "hogar", "coche": "hogar",
+    "cocina": "cocina", "alimentacion": "cocina",
+    "deporte": "deporte", "deportes": "deporte",
+    "moda": "moda", "ropa": "moda", "equipaje": "moda",
+    "belleza": "belleza", "cuidado personal": "belleza", "salud": "belleza",
+    "bebe": "bebe", "juguetes": "bebe",
+    "mascotas": "mascotas",
+}
+MIN_POR_CATEGORIA = 3   # menos que esto seria una pagina vacia para Google
+
+
+def categoria_web(nombre: str) -> str:
+    """Slug de la categoria de la web para un nombre del CSV, o '' si no encaja."""
+    import unicodedata
+    t = unicodedata.normalize("NFKD", nombre or "").encode("ascii", "ignore").decode()
+    return _ALIAS_CATEGORIA.get(t.strip().lower(), "")
+
+
+def _categorias_por_asin(entradas: list, ruta_csv: str = "ofertas.csv") -> dict:
+    """ASIN -> slug. Usa la categoria guardada en el estado y, para las
+    entradas antiguas que no la tienen, la del ofertas.csv."""
+    del_csv = {}
+    if os.path.exists(ruta_csv):
+        with open(ruta_csv, encoding="utf-8-sig", newline="") as f:
+            for fila in csv.DictReader(f):
+                del_csv[(fila.get("asin") or "").strip()] = fila.get("categoria") or ""
+    return {e["asin"]: categoria_web(e.get("categoria") or del_csv.get(e["asin"], ""))
+            for e in entradas}
+
+
+def _items_html(entradas: list) -> str:
+    raiz = _raiz()
+    filas = []
+    for e in entradas:
+        pct = descuento(e["precio_ahora"], e.get("precio_antes") or 0)
+        filas.append(f"""  <article class="item">
+    <img src="{html.escape(raiz + "/" + e.get("imagen", ""), quote=True)}" alt="" loading="lazy">
+    <div>
+      <a href="{html.escape(raiz + "/" + ruta_ficha(e), quote=True)}">{html.escape(e["titulo"])}</a>
+      <div class="p">{e["precio_ahora"]:.2f} €{f" · -{pct}%" if pct else ""}</div>
+    </div>
+  </article>""")
+    return "\n".join(filas)
+
+
+def _pagina_categoria(slug: str, entradas: list) -> str:
+    raiz = _raiz()
+    nombre, intro = CATEGORIAS_WEB[slug]
+    canonica = f"{raiz}/categoria/{slug}.html"
+    cuerpo = (f'  <p class="migas"><a href="{raiz}/">{html.escape(MARCA)}</a> · '
+              f'<a href="{raiz}/ofertas.html">Ofertas</a></p>\n'
+              f'  <h1>Chollos de {html.escape(nombre.lower())} en Amazon</h1>\n'
+              f'  <p class="fecha">{html.escape(intro)} Cada oferta indica sobre qué precio '
+              f'se calcula el descuento y el día en que se comprobó.</p>\n'
+              + cta_telegram_html() + _items_html(entradas) + "\n")
+    return (CABECERA_SEO.format(
+                titulo_seo=html.escape(f"Chollos de {nombre.lower()} en Amazon | {MARCA}", quote=True),
+                descripcion=html.escape(f"{intro} {len(entradas)} ofertas publicadas en {MARCA}.",
+                                        quote=True),
+                canonica=html.escape(canonica, quote=True),
+                og_imagen=html.escape(f'{raiz}/{entradas[0].get("imagen", "")}', quote=True),
+                og_tipo="website", marca=html.escape(MARCA), extra="")
+            + cuerpo + PIE_SEO.format(raiz=raiz, marca=html.escape(MARCA)))
+
+
+def _ficha(e: dict, cat: str = "") -> str:
     """Una ficha por oferta, con datos estructurados para Google."""
     pct = descuento(e["precio_ahora"], e.get("precio_antes") or 0)
     raiz = _raiz()
@@ -1327,8 +1414,11 @@ def _ficha(e: dict) -> str:
         bloque_antes = (f'<span class="antes">{referencia(e)} {e["precio_antes"]:.2f} €</span>'
                         f'<span class="pct">-{pct}%</span>')
 
+    miga_cat = ""
+    if cat in CATEGORIAS_WEB:
+        miga_cat = f' · <a href="{raiz}/categoria/{cat}.html">{html.escape(CATEGORIAS_WEB[cat][0])}</a>'
     cuerpo = f"""  <p class="migas"><a href="{raiz}/">{html.escape(MARCA)}</a> ·
-  <a href="{raiz}/ofertas.html">Ofertas</a></p>
+  <a href="{raiz}/ofertas.html">Ofertas</a>{miga_cat}</p>
   <h1>{html.escape(e["titulo"])}</h1>
   <figure><img src="{html.escape(imagen, quote=True)}" alt="{html.escape(e["titulo"], quote=True)}"></figure>
   <div class="precios"><span class="ahora">{e["precio_ahora"]:.2f} €</span>{bloque_antes}</div>
@@ -1354,21 +1444,19 @@ def _ficha(e: dict) -> str:
             + cuerpo + PIE_SEO.format(raiz=raiz, marca=html.escape(MARCA)))
 
 
-def _archivo(entradas: list) -> str:
+def _archivo(entradas: list, cats: dict = None) -> str:
     raiz = _raiz()
-    filas = []
-    for e in entradas:
-        pct = descuento(e["precio_ahora"], e.get("precio_antes") or 0)
-        filas.append(f"""  <article class="item">
-    <img src="{html.escape(raiz + "/" + e.get("imagen", ""), quote=True)}" alt="" loading="lazy">
-    <div>
-      <a href="{html.escape(raiz + "/" + ruta_ficha(e), quote=True)}">{html.escape(e["titulo"])}</a>
-      <div class="p">{e["precio_ahora"]:.2f} €{f" · -{pct}%" if pct else ""}</div>
-    </div>
-  </article>""")
+    cats = cats or {}
+    indice = ""
+    if cats:
+        enlaces = " · ".join(
+            f'<a href="{raiz}/categoria/{slug}.html">{html.escape(CATEGORIAS_WEB[slug][0])}</a> ({n})'
+            for slug, n in cats.items())
+        indice = f'  <p class="migas">Por categoría: {enlaces}</p>\n'
+    filas = [_items_html(entradas)]
     cuerpo = (f'  <h1>Todas las ofertas de {html.escape(MARCA)}</h1>\n'
               f'  <p class="fecha">Chollos de Amazon publicados hasta hoy, con el precio '
-              f'que tenian el dia de la publicacion.</p>\n' + cta_telegram_html()
+              f'que tenian el dia de la publicacion.</p>\n' + indice + cta_telegram_html()
               + "\n".join(filas) + "\n")
     return (CABECERA_SEO.format(
                 titulo_seo=html.escape(f"Todas las ofertas | {MARCA}", quote=True),
@@ -1395,17 +1483,34 @@ def regenerar_seo(ruta_estado: str = "estado.json", dir_docs: str = "docs") -> i
     if not entradas:
         return 0
 
+    por_asin = _categorias_por_asin(entradas)
+    grupos = {}
+    for e in entradas:
+        if por_asin.get(e["asin"]):
+            grupos.setdefault(por_asin[e["asin"]], []).append(e)
+    grupos = {slug: grupos[slug] for slug in CATEGORIAS_WEB
+              if len(grupos.get(slug, [])) >= MIN_POR_CATEGORIA}
+
     os.makedirs(os.path.join(dir_docs, "oferta"), exist_ok=True)
     for e in entradas:
         destino = os.path.join(dir_docs, ruta_ficha(e))
+        cat = por_asin.get(e["asin"], "")
         with open(destino, "w", encoding="utf-8") as f:
-            f.write(_ficha(e))
+            f.write(_ficha(e, cat if cat in grupos else ""))
+
+    os.makedirs(os.path.join(dir_docs, "categoria"), exist_ok=True)
+    for slug, lista in grupos.items():
+        with open(os.path.join(dir_docs, "categoria", f"{slug}.html"), "w", encoding="utf-8") as f:
+            f.write(_pagina_categoria(slug, lista))
 
     with open(os.path.join(dir_docs, "ofertas.html"), "w", encoding="utf-8") as f:
-        f.write(_archivo(entradas))
+        f.write(_archivo(entradas, {slug: len(lista) for slug, lista in grupos.items()}))
 
-    urls = [f"{raiz}/", f"{raiz}/ofertas.html"] + [f"{raiz}/{ruta_ficha(e)}" for e in entradas]
-    fechas = ["", ""] + [e.get("fecha", "")[:10] for e in entradas]
+    urls = ([f"{raiz}/", f"{raiz}/ofertas.html"]
+            + [f"{raiz}/categoria/{slug}.html" for slug in grupos]
+            + [f"{raiz}/{ruta_ficha(e)}" for e in entradas])
+    fechas = (["", ""] + [lista[0].get("fecha", "")[:10] for lista in grupos.values()]
+              + [e.get("fecha", "")[:10] for e in entradas])
     cuerpo = "\n".join(
         f"  <url><loc>{html.escape(u, quote=True)}</loc>"
         + (f"<lastmod>{d}</lastmod>" if d else "") + "</url>"
@@ -1418,7 +1523,8 @@ def regenerar_seo(ruta_estado: str = "estado.json", dir_docs: str = "docs") -> i
     with open(os.path.join(dir_docs, "robots.txt"), "w", encoding="utf-8") as f:
         f.write(f"User-agent: *\nAllow: /\nDisallow: /tiktok.html\n\nSitemap: {raiz}/sitemap.xml\n")
 
-    print(f"Sitio SEO regenerado: {len(entradas)} fichas, archivo y sitemap.")
+    print(f"Sitio SEO regenerado: {len(entradas)} fichas, {len(grupos)} categorias, "
+          f"archivo y sitemap.")
     return len(entradas)
 
 # ======================================================================
