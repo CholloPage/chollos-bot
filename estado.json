@@ -1394,6 +1394,24 @@
         "historia"
       ],
       "fecha": "2026-09-30T05:23:17+00:00"
+    },
+    {
+      "asin": "B00GY24XP6",
+      "titulo": "Supradyn Energy 30 Comprimidos",
+      "precio_ahora": 10.04,
+      "precio_antes": 12.34,
+      "imagen": "img/20260930-0621-B00GY24XP6.jpg",
+      "historia": "img/20260930-0621-B00GY24XP6-historia.jpg",
+      "referencia": "PVP",
+      "categoria": "Belleza",
+      "texto_tiktok": "Supradyn Energy 30 Comprimidos por 10.04 € (-19%)\nLo encuentras en el enlace de la bio, arriba del todo.\nEnlace de afiliado: si compras, me llevo una pequeña comisión y a ti no te cuesta nada más.\n#chollosamazon #chollosdeldia #belleza #cuidadodelapiel #skincare #ofertasbelleza",
+      "canales": [
+        "telegram",
+        "facebook-reel",
+        "instagram-reel",
+        "historia"
+      ],
+      "fecha": "2026-09-30T06:23:14+00:00"
     }
   ]
 }
