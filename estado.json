@@ -1646,6 +1646,24 @@
         "historia"
       ],
       "fecha": "2026-10-01T10:26:43+00:00"
+    },
+    {
+      "asin": "B07FDC1XMC",
+      "titulo": "Rotho Cody recipiente comida mascotas",
+      "precio_ahora": 23.99,
+      "precio_antes": 30.29,
+      "imagen": "img/20261001-1106-B07FDC1XMC.jpg",
+      "historia": "img/20261001-1106-B07FDC1XMC-historia.jpg",
+      "referencia": "PVP",
+      "categoria": "Mascotas",
+      "texto_tiktok": "Rotho Cody recipiente comida mascotas por 23.99 € (-21%)\nEnlace en la bio.\nEnlace de afiliado: si compras, me llevo una pequeña comisión y a ti no te cuesta nada más.\n#chollosamazon #chollosdeldia #mascotas #perros #gatos #ofertasmascotas",
+      "canales": [
+        "telegram",
+        "facebook-reel",
+        "instagram-reel",
+        "historia"
+      ],
+      "fecha": "2026-10-01T11:07:22+00:00"
     }
   ]
 }
