@@ -1844,6 +1844,24 @@
         "historia"
       ],
       "fecha": "2026-10-02T11:14:21+00:00"
+    },
+    {
+      "asin": "B081QPCTT8",
+      "titulo": "BRA Efficient tacoma para cuchillos",
+      "precio_ahora": 17.29,
+      "precio_antes": 21.9,
+      "imagen": "img/20261002-1531-B081QPCTT8.jpg",
+      "historia": "img/20261002-1531-B081QPCTT8-historia.jpg",
+      "referencia": "PVP",
+      "categoria": "Cocina",
+      "texto_tiktok": "BRA Efficient tacoma para cuchillos por 17.29 € (-21%)\nEnlace en la bio.\nEnlace de afiliado: si compras, me llevo una pequeña comisión y a ti no te cuesta nada más.\n#chollosamazon #chollosdeldia #cocina #utensiliosdecocina #ofertascocina #recetasfaciles",
+      "canales": [
+        "telegram",
+        "facebook-reel",
+        "instagram-reel",
+        "historia"
+      ],
+      "fecha": "2026-10-02T15:32:54+00:00"
     }
   ]
 }
