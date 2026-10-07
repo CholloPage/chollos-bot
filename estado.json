@@ -2420,6 +2420,24 @@
         "historia"
       ],
       "fecha": "2026-10-07T10:23:25+00:00"
+    },
+    {
+      "asin": "B0CL8K8M3D",
+      "titulo": "VENUM Classic Gorra de Tenis",
+      "precio_ahora": 14.39,
+      "precio_antes": 19.99,
+      "imagen": "img/20261007-1109-B0CL8K8M3D.jpg",
+      "historia": "img/20261007-1109-B0CL8K8M3D-historia.jpg",
+      "referencia": "PVP",
+      "categoria": "Deporte",
+      "texto_tiktok": "VENUM Classic Gorra de Tenis por 14.39 € (-28%)\nLo encuentras en el enlace de la bio, arriba del todo.\nEnlace de afiliado: si compras, me llevo una pequeña comisión y a ti no te cuesta nada más.\n#chollosamazon #chollosdeldia #fitnessencasa #deporte #entrenamiento #ofertasdeporte",
+      "canales": [
+        "telegram",
+        "facebook-reel",
+        "instagram-reel",
+        "historia"
+      ],
+      "fecha": "2026-10-07T11:10:43+00:00"
     }
   ]
 }
