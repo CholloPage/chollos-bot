@@ -284,6 +284,7 @@ FONDO = (17, 20, 28)
 ACENTO = (255, 214, 61)
 TEXTO = (245, 246, 250)
 APAGADO = (150, 156, 170)
+AMAZON = (255, 153, 0)  # naranja de acento para dejar claro que la oferta es de Amazon
 
 
 def _fuente(tam: int, negrita: bool = True):
@@ -341,8 +342,22 @@ def _fondo():
 
 def _pie(dib) -> None:
     dib.line([(80, 940), (LADO - 80, 940)], fill=(60, 66, 80), width=2)
-    _centrar(dib, 968, MARCA.upper(), _fuente(32), APAGADO)
-    _centrar(dib, 1014, "ENLACE EN LA BIO  ·  PUBLICIDAD", _fuente(24, negrita=False), APAGADO)
+    _centrar(dib, 956, f"{MARCA.upper()}  ·  CHOLLO DE AMAZON.ES", _fuente(32), AMAZON)
+    _centrar(dib, 1008, "NO VENDEMOS NADA  ·  ENLACE EN LA BIO  ·  PUBLICIDAD",
+             _fuente(23, negrita=False), APAGADO)
+
+
+def _etiqueta_amazon(dib, x: int, y: int, tam: int = 30) -> int:
+    """Etiqueta 'OFERTA EN AMAZON.ES' (texto, sin logo): deja claro de un
+    vistazo que el chollo es de Amazon y que nosotros no vendemos nada."""
+    f = _fuente(tam)
+    texto = "OFERTA EN AMAZON.ES"
+    an = _ancho(dib, texto, f)
+    pad = int(tam * 0.55)
+    al = int(tam * 1.9)
+    dib.rounded_rectangle([(x, y), (x + an + 2 * pad, y + al)], radius=al // 2, fill=AMAZON)
+    dib.text((x + pad, y + (al - tam) / 2 - tam * 0.12), texto, font=f, fill=FONDO)
+    return an + 2 * pad
 
 
 def _insignia(dib, pct: int) -> None:
@@ -381,6 +396,7 @@ def generar_foto(oferta: dict, foto, destino: str) -> str:
     )
 
     _insignia(dib, pct)
+    _etiqueta_amazon(dib, 120, 84, 30)
 
     # Titulo en una linea
     titulo = oferta["titulo"]
@@ -436,7 +452,8 @@ def generar(oferta: dict, destino: str, foto=None) -> str:
     pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
 
     _insignia(dib, pct)
-    _centrar(dib, 130, (oferta.get("categoria") or "CHOLLO").upper(), _fuente(30), APAGADO)
+    _etiqueta_amazon(dib, 70, 84, 30)
+    _centrar(dib, 230, (oferta.get("categoria") or "CHOLLO").upper(), _fuente(30), APAGADO)
 
     titulo = oferta["titulo"]
     if len(titulo) > 90:
@@ -495,6 +512,7 @@ def generar_historia(oferta: dict, foto, destino: str) -> str:
         img.paste(producto, (caja[0] + (caja[2] - caja[0] - producto.width) // 2,
                              caja[1] + (caja[3] - caja[1] - producto.height) // 2))
 
+    _etiqueta_amazon(dib, 120, 240, 40)
     if pct:
         f_pct = _fuente(72)
         etiqueta = f"-{pct}%"
@@ -527,8 +545,9 @@ def generar_historia(oferta: dict, foto, destino: str) -> str:
     dib.line([(LADO / 2 - 70, 1660), (LADO / 2, 1590), (LADO / 2 + 70, 1660)],
              fill=ACENTO, width=22, joint="curve")
     _centrar(dib, 1700, "ENLACE EN LA BIO", _fuente(44), ACENTO)
-    _centrar(dib, 1810, "PUBLICIDAD  ·  ENLACE DE AFILIADO",
-             _fuente(28, negrita=False), APAGADO)
+    _centrar(dib, 1768, "CHOLLO DE AMAZON.ES  ·  NO VENDEMOS NADA", _fuente(32), AMAZON)
+    _centrar(dib, 1822, "PUBLICIDAD  ·  ENLACE DE AFILIADO  ·  GANAMOS UNA COMISION",
+             _fuente(26, negrita=False), APAGADO)
 
     os.makedirs(os.path.dirname(destino), exist_ok=True)
     img.save(destino, "JPEG", quality=88, optimize=True)
