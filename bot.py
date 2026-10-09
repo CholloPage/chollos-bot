@@ -69,7 +69,8 @@ MARCA = os.environ.get("MARCA", "CholloPage")
 # publicacion y en la pagina de destino). No la quites.
 DIVULGACION = (
     "Enlace de afiliado: si compras, me llevo una pequeña comisión "
-    "y a ti no te cuesta nada más."
+    "y a ti no te cuesta nada más. "
+    "La oferta es de Amazon.es: nosotros no vendemos nada."
 )
 
 
@@ -209,7 +210,7 @@ def enlace_afiliado(asin: str) -> str:
 
 
 def texto_facebook(oferta: dict) -> str:
-    partes = [f"{random.choice(APERTURAS)}: {oferta['titulo']}", linea_precio(oferta)]
+    partes = [f"{random.choice(APERTURAS)} en Amazon: {oferta['titulo']}", linea_precio(oferta)]
     if oferta.get("gancho"):
         partes.append(oferta["gancho"] + ".")
     partes.append(enlace_afiliado(oferta["asin"]))
@@ -223,7 +224,7 @@ def texto_facebook(oferta: dict) -> str:
 def texto_instagram(oferta: dict) -> str:
     """En Instagram el enlace del pie no es clicable, asi que el copy
     empuja a la bio, donde vive el enlace real."""
-    partes = [f"{random.choice(APERTURAS)}: {oferta['titulo']}", linea_precio(oferta)]
+    partes = [f"{random.choice(APERTURAS)} en Amazon: {oferta['titulo']}", linea_precio(oferta)]
     if oferta.get("gancho"):
         partes.append(oferta["gancho"] + ".")
     partes.append(random.choice(CIERRES))
@@ -238,7 +239,7 @@ def texto_telegram(oferta: dict) -> str:
     """Telegram admite HTML sencillo. El enlace va en un boton debajo de
     la foto, no en el texto, que queda mas limpio."""
     pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
-    lineas = [f"<b>{html.escape(oferta['titulo'])}</b>", ""]
+    lineas = ["<b>OFERTA EN AMAZON.ES</b>", f"<b>{html.escape(oferta['titulo'])}</b>", ""]
     if pct:
         lineas.append(f"<b>{euros(oferta['precio_ahora'])}</b>  "
                       f"<s>{euros(oferta['precio_antes'])}</s>  -{pct}%")
@@ -253,7 +254,7 @@ def texto_telegram(oferta: dict) -> str:
 
 def texto_tiktok(oferta: dict) -> str:
     pct = descuento(oferta["precio_ahora"], oferta["precio_antes"])
-    cabeza = f"{oferta['titulo']} por {oferta['precio_ahora']:.2f} €"
+    cabeza = f"{oferta['titulo']} por {oferta['precio_ahora']:.2f} € en Amazon"
     if pct:
         cabeza += f" (-{pct}%)"
     return "\n".join([
@@ -998,7 +999,7 @@ TARJETA = """  <a class="oferta" href="{enlace}" target="_blank" rel="nofollow s
         </div>
       </div>
     </div>
-    <div class="cuando">Publicado el {cuando} (hora peninsular)</div>
+    <div class="cuando">Oferta en Amazon.es · Publicado el {cuando} (hora peninsular)</div>
   </a>
 """
 
