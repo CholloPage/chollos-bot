@@ -2798,6 +2798,24 @@
         "historia"
       ],
       "fecha": "2026-10-10T12:16:00+00:00"
+    },
+    {
+      "asin": "B0DTQWYZFF",
+      "titulo": "Amazon Echo Show 8 nueva generacion",
+      "precio_ahora": 134.99,
+      "precio_antes": 219.99,
+      "imagen": "img/20261011-1121-B0DTQWYZFF.jpg",
+      "historia": "img/20261011-1121-B0DTQWYZFF-historia.jpg",
+      "referencia": "PVP",
+      "categoria": "Tecnologia",
+      "texto_tiktok": "Amazon Echo Show 8 nueva generacion por 134.99 € en Amazon (-39%)\nLink en la bio.\nEnlace de afiliado: si compras, me llevo una pequeña comisión y a ti no te cuesta nada más. La oferta es de Amazon.es: nosotros no vendemos nada.\n#chollosamazon #chollosdeldia #chollostecnologicos #gadgets #tecnologia #ofertasamazon",
+      "canales": [
+        "telegram",
+        "facebook-reel",
+        "instagram-reel",
+        "historia"
+      ],
+      "fecha": "2026-10-11T11:22:35+00:00"
     }
   ]
 }
